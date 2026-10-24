@@ -336,9 +336,29 @@ export default function Navbar() {
     };
   }, []);
 
+  // Close menus when navigating to another page.
   useEffect(() => {
     closeMenus();
   }, [location.pathname]);
+
+  // Automatically close the mobile menu when scrolling.
+  useEffect(() => {
+    if (!menuOpen) return;
+
+    const handleScroll = () => {
+      setMenuOpen(false);
+      setMobileOpenSubmenus([]);
+    };
+
+    window.addEventListener("scroll", handleScroll, {
+      passive: true,
+    });
+
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+    };
+  }, [menuOpen]);
+
 
   useEffect(() => {
     const handleResize = () => {
