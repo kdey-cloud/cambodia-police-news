@@ -1,4 +1,3 @@
-
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import {
@@ -128,7 +127,10 @@ const navLinks: NavigationLink[] = [
           {
             label: "Master Degree",
             children: [
-              { label: "Security Specialization", href: "/security-specialization" },
+              {
+                label: "Security Specialization",
+                href: "/security-specialization",
+              },
               {
                 label: "Judicial Police Specialization",
                 href: "/judicial-police-specialization",
@@ -144,7 +146,10 @@ const navLinks: NavigationLink[] = [
             children: [
               { label: "Public Order", href: "/public-order-specialization-2" },
               { label: "Immigration", href: "/immigration-specialization" },
-              { label: "Identification", href: "/identification-specialization" },
+              {
+                label: "Identification",
+                href: "/identification-specialization",
+              },
               { label: "Security", href: "/security-specialization-2" },
               {
                 label: "English",
@@ -359,7 +364,6 @@ export default function Navbar() {
     };
   }, [menuOpen]);
 
-
   useEffect(() => {
     const handleResize = () => {
       setMobileOpenSubmenus([]);
@@ -490,7 +494,9 @@ export default function Navbar() {
         <span className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-600">
           {copied ? <Check size={17} /> : <Copy size={17} />}
         </span>
-        {copied ? t("copied", { defaultValue: "Copied!" }) : t("copyLink", { defaultValue: "Copy link" })}
+        {copied
+          ? t("copied", { defaultValue: "Copied!" })
+          : t("copyLink", { defaultValue: "Copy link" })}
       </button>
     </div>
   );
@@ -509,9 +515,7 @@ export default function Navbar() {
 
       const linkContent = (
         <>
-          <span className="min-w-0 flex-1">
-            {translateLabel(item.label)}
-          </span>
+          <span className="min-w-0 flex-1">{translateLabel(item.label)}</span>
 
           {hasChildren && (
             <ChevronRight
@@ -631,10 +635,11 @@ export default function Navbar() {
       }`;
 
       return (
-        <div key={itemKey} className="border-b border-slate-100 last:border-b-0">
-          <div
-            className={`flex items-center gap-2 ${depth > 0 ? "pl-3" : ""}`}
-          >
+        <div
+          key={itemKey}
+          className="border-b border-slate-100 last:border-b-0"
+        >
+          <div className={`flex items-center gap-2 ${depth > 0 ? "pl-3" : ""}`}>
             {hasChildren ? (
               <>
                 <button
@@ -762,14 +767,18 @@ export default function Navbar() {
 
           {/* Header actions */}
           <div className="ml-auto flex shrink-0 items-center gap-0.5 sm:gap-2">
-            <LanguageSwitcher />
+            {/* Hide language flag at 440px or narrower */}
+            <div className="max-[1280px]:hidden">
+              <LanguageSwitcher />
+            </div>
 
+            {/* Hide search at 440px or narrower */}
             <button
               type="button"
               onClick={openSearch}
               aria-label={t("search", { defaultValue: "Search" })}
               title={t("search", { defaultValue: "Search" })}
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-slate-700 transition-colors duration-200 hover:bg-blue-50 hover:text-blue-700 sm:h-10 sm:w-10"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-slate-700 transition-colors duration-200 hover:bg-blue-50 hover:text-blue-700 max-[375px]:hidden sm:h-10 sm:w-10"
             >
               <Search size={20} />
             </button>
@@ -947,15 +956,26 @@ export default function Navbar() {
         }`}
       >
         <div className="max-h-[calc(100dvh-5rem)] overflow-x-hidden overflow-y-auto overscroll-contain px-4 pb-6 pt-4 sm:px-6">
-          {/* Mobile search */}
-          <button
-            type="button"
-            onClick={openSearch}
-            className="mb-4 flex min-h-11 w-full items-center gap-3 rounded-lg border border-slate-200 px-4 text-left text-sm font-medium text-slate-600 transition-colors hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
-          >
-            <Search size={19} />
-            <span>{t("search", { defaultValue: "Search" })}</span>
-          </button>
+          {/* Mobile search and language row */}
+          <div className="mb-4 flex items-center gap-3">
+            {/* Search button */}
+            <button
+              type="button"
+              onClick={openSearch}
+              className="flex min-h-11 min-w-0 flex-1 items-center gap-2 rounded-lg border border-slate-200 px-3 text-left text-sm font-medium text-slate-600 transition-colors hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
+            >
+              <Search size={19} className="shrink-0" />
+              <span>{t("search", { defaultValue: "Search" })}</span>
+            </button>
+
+            {/* Divider */}
+            <div className="hidden h-7 w-px shrink-0 bg-slate-200 min-[441px]:hidden" />
+
+            {/* Language switcher */}
+            <div className="hover:text-blue-700 min-[1280px]:hidden">
+              <LanguageSwitcher />
+            </div>
+          </div>
 
           {/* Mobile navigation links */}
           <nav className="flex flex-col">
@@ -976,10 +996,7 @@ export default function Navbar() {
                   );
 
                 return (
-                  <div
-                    key={link.key}
-                    className="border-b border-slate-100"
-                  >
+                  <div key={link.key} className="border-b border-slate-100">
                     <div className="flex min-h-12 items-center">
                       <button
                         type="button"
@@ -1108,4 +1125,3 @@ export default function Navbar() {
     </header>
   );
 }
-
