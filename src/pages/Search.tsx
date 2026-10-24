@@ -1,7 +1,7 @@
 
 import { useState, type FormEvent } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { Search, ArrowLeft, CalendarDays } from "lucide-react";
+import { Search, ArrowLeft } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 export default function SearchPage() {

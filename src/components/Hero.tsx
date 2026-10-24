@@ -7,7 +7,6 @@ import {
 import { Link } from "react-router-dom";
 import { newsArticles } from "../data/news";
 
-const BRAND_BLUE = "#1D4ED8";
 
 export default function Hero() {
   const featuredNews = newsArticles.slice(0, 3);
