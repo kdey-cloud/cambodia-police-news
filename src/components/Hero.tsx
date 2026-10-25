@@ -1,19 +1,67 @@
 import { useEffect, useState } from "react";
-import {
-  CalendarDays,
-  ChevronLeft,
-  ChevronRight,
-} from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
 import { Link } from "react-router-dom";
-import { newsArticles } from "../data/news";
+import { useTranslation } from "react-i18next";
+import { supabase } from "../lib/supabase";
 
+interface NewsArticle {
+  id: string;
+  title_km: string | null;
+  title_en: string | null;
+  image_url: string | null;
+  published_at: string | null;
+  created_at: string;
+}
 
 export default function Hero() {
-  const featuredNews = newsArticles.slice(0, 3);
+  const { i18n } = useTranslation();
 
+  const isKhmer = i18n.language.startsWith("km");
+
+  const [featuredNews, setFeaturedNews] = useState<NewsArticle[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
   const [paused, setPaused] = useState(false);
+  const [loading, setLoading] = useState(true);
 
+  // Load published news directly from Supabase.
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadFeaturedNews() {
+      setLoading(true);
+
+      const { data, error } = await supabase
+        .from("news")
+        .select("id, title_km, title_en, image_url, published_at, created_at")
+        .eq("status", "published")
+        .order("published_at", {
+          ascending: false,
+          nullsFirst: false,
+        })
+        .order("created_at", { ascending: false })
+        .limit(3);
+
+      if (!isMounted) return;
+
+      if (error) {
+        console.error("Failed to load featured news:", error);
+        setFeaturedNews([]);
+      } else {
+        setFeaturedNews(data ?? []);
+      }
+
+      setActiveIndex(0);
+      setLoading(false);
+    }
+
+    loadFeaturedNews();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Automatically change slides.
   useEffect(() => {
     if (paused || featuredNews.length <= 1) return;
 
@@ -24,18 +72,65 @@ export default function Hero() {
     return () => window.clearInterval(timer);
   }, [paused, featuredNews.length]);
 
-  if (featuredNews.length === 0) return null;
-
   const nextSlide = () => {
     setActiveIndex((current) => (current + 1) % featuredNews.length);
   };
 
   const previousSlide = () => {
     setActiveIndex(
-      (current) =>
-        (current - 1 + featuredNews.length) % featuredNews.length,
+      (current) => (current - 1 + featuredNews.length) % featuredNews.length,
     );
   };
+
+  function getTitle(article: NewsArticle) {
+    if (isKhmer) {
+      return article.title_km?.trim() || article.title_en?.trim() || "ព័ត៌មាន";
+    }
+
+    return article.title_en?.trim() || article.title_km?.trim() || "News";
+  }
+
+  function formatDate(article: NewsArticle) {
+    const date = article.published_at || article.created_at;
+
+    if (!date) return "";
+
+    return new Intl.DateTimeFormat(isKhmer ? "km-KH" : "en-GB", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    }).format(new Date(date));
+  }
+
+  if (loading) {
+    return (
+      <section className="bg-slate-50 py-5 sm:py-7 md:py-9">
+        <div className="mx-auto max-w-7xl px-3 sm:px-5">
+          <div className="flex h-[300px] items-center justify-center rounded-xl bg-white shadow-sm sm:h-[380px] md:h-[430px]">
+            <p className="text-sm text-slate-500">
+              {isKhmer ? "កំពុងផ្ទុកព័ត៌មាន..." : "Loading news..."}
+            </p>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  if (featuredNews.length === 0) {
+    return (
+      <section className="bg-slate-50 py-5 sm:py-7 md:py-9">
+        <div className="mx-auto max-w-7xl px-3 sm:px-5">
+          <div className="flex h-[200px] items-center justify-center rounded-xl bg-white shadow-sm">
+            <p className="text-sm text-slate-500">
+              {isKhmer
+                ? "មិនទាន់មានព័ត៌មានដែលបានផ្សព្វផ្សាយទេ។"
+                : "No published news available yet."}
+            </p>
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="bg-slate-50 py-5 sm:py-7 md:py-9">
@@ -48,9 +143,7 @@ export default function Hero() {
           onFocusCapture={() => setPaused(true)}
           onBlurCapture={(event) => {
             if (
-              !event.currentTarget.contains(
-                event.relatedTarget as Node | null,
-              )
+              !event.currentTarget.contains(event.relatedTarget as Node | null)
             ) {
               setPaused(false);
             }
@@ -58,7 +151,7 @@ export default function Hero() {
           aria-roledescription="carousel"
           aria-label="Featured news"
         >
-          <div className="relative h-[300px] sm:h-[380px] md:h-[430px] lg:h-[460px]">
+          <div className="relative h-[320px] sm:h-[400px] md:h-[480px] lg:h-[560px] xl:h-[620px] 2xl:h-[680px]">
             {featuredNews.map((article, index) => (
               <div
                 key={article.id}
@@ -72,35 +165,32 @@ export default function Hero() {
                 }`}
               >
                 {/* News image */}
-                <img
-                  src={article.image}
-                  alt={article.title}
-                  loading={index === 0 ? "eager" : "lazy"}
-                  className="absolute inset-0 h-full w-full object-cover"
-                />
+                {article.image_url ? (
+                  <img
+                    src={article.image_url}
+                    alt={getTitle(article)}
+                    loading={index === 0 ? "eager" : "lazy"}
+                    className="absolute inset-0 h-full w-full object-cover object-center"
+                  />
+                ) : (
+                  <div className="absolute inset-0 bg-gradient-to-br from-blue-900 to-slate-900" />
+                )}
 
-                {/* Subtle image overlay */}
+                {/* Image overlay */}
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-900/35 to-transparent" />
 
                 {/* News information */}
-                <div className="absolute inset-x-0 bottom-0 p-4 pb-16 text-white sm:p-7 sm:pb-16 md:p-9 md:pb-16">
+                <div className="absolute inset-x-0 bottom-0 p-4 pb-8 text-white sm:p-7 sm:pb-8 md:p-10 md:pb-8 lg:p-12 lg:pb-8">
                   <div className="mb-3 flex items-center gap-2 text-xs text-white/85 sm:text-sm">
                     <CalendarDays size={15} />
-                    <time>{article.date}</time>
+                    <time>{formatDate(article)}</time>
                   </div>
-
-                  <h2 className="line-clamp-3 max-w-4xl text-xl font-bold leading-snug sm:text-2xl md:text-4xl lg:text-5xl">
-                    {article.title}
-                  </h2>
-
                   <Link
                     to={`/news/${article.id}`}
                     tabIndex={index === activeIndex ? 0 : -1}
-                    onClick={(event) => event.stopPropagation()}
-                    className="mt-4 inline-flex items-center gap-2 rounded-md bg-white px-4 py-2 text-sm font-semibold text-[#1D4ED8] transition hover:bg-blue-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white"
+                    className="line-clamp-2 text-xl font-bold leading-snug sm:text-2xl md:line-clamp-3 md:text-3xl lg:text-4xl"
                   >
-                    Read News
-                    <ChevronRight size={17} />
+                    {getTitle(article)}
                   </Link>
                 </div>
               </div>
@@ -164,15 +254,19 @@ export default function Hero() {
                     : "border-slate-200 hover:border-slate-300"
                 }`}
               >
-                <img
-                  src={article.image}
-                  alt=""
-                  loading="lazy"
-                  className="h-16 w-24 shrink-0 rounded-lg object-cover"
-                />
+                {article.image_url ? (
+                  <img
+                    src={article.image_url}
+                    alt=""
+                    loading="lazy"
+                    className="h-16 w-24 shrink-0 rounded-lg object-cover"
+                  />
+                ) : (
+                  <div className="h-16 w-24 shrink-0 rounded-lg bg-slate-200" />
+                )}
 
                 <span className="line-clamp-2 text-sm font-semibold leading-5 text-slate-800">
-                  {article.title}
+                  {getTitle(article)}
                 </span>
               </button>
             ))}

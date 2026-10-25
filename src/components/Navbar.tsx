@@ -15,6 +15,7 @@ import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import LanguageSwitcher from "./LanguageSwitcher";
 
+
 type SubmenuLink = {
   label: string;
   href?: string;
@@ -400,10 +401,18 @@ export default function Navbar() {
     );
   };
 
-  const openSearch = () => {
-    closeMenus();
+
+const openSearch = () => {
+  if (location.pathname === "/search") {
+    navigate(-1);
+  } else {
     navigate("/search");
-  };
+  }
+
+  closeMenus();
+};
+
+
 
   const shareToFacebook = () => {
     const url = encodeURIComponent(window.location.href);
