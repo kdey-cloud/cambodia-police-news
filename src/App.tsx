@@ -1,3 +1,4 @@
+
 import { Routes, Route } from "react-router-dom";
 
 import Navbar from "./components/Navbar";
@@ -27,7 +28,10 @@ function PublicLayout() {
           <Route path="/" element={<Home />} />
           <Route path="/news/:id" element={<NewsDetail />} />
           <Route path="/search" element={<Search />} />
-          <Route path="/institution/background" element={<Background />} />
+          <Route
+            path="/institution/background"
+            element={<Background />}
+          />
         </Routes>
       </main>
 
@@ -39,11 +43,10 @@ function PublicLayout() {
 export default function App() {
   return (
     <Routes>
-      {/* Public website */}
-      <Route path="/*" element={<PublicLayout />} />
       {/* Admin login */}
       <Route path="/admin/login" element={<AdminLogin />} />
-      {/* Admin dashboard */}
+
+      {/* Protected admin pages */}
       <Route
         path="/admin"
         element={
@@ -53,13 +56,14 @@ export default function App() {
         }
       >
         <Route index element={<AdminDashboard />} />
-
         <Route path="dashboard" element={<AdminDashboard />} />
-
         <Route path="news" element={<ManageNews />} />
-
         <Route path="news/new" element={<CreateNews />} />
       </Route>
+
+      {/* Public website */}
+      <Route path="/*" element={<PublicLayout />} />
     </Routes>
   );
 }
+
