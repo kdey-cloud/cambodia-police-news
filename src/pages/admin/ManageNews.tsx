@@ -12,6 +12,8 @@ import {
   AlertCircle,
   Eye,
   ExternalLink,
+  Pin,
+  PinOff,
 } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 
@@ -23,6 +25,7 @@ interface NewsArticle {
   status: string;
   published_at: string | null;
   created_at: string;
+  is_pinned: boolean;
 }
 
 type Language = "en" | "km";
@@ -32,12 +35,19 @@ export default function ManageNews() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [deletingId, setDeletingId] = useState<string | number | null>(null);
+  const [pinningId, setPinningId] = useState<string | number | null>(null);
   const [error, setError] = useState("");
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [categoryFilter, setCategoryFilter] = useState("All");
   const [language, setLanguage] = useState<Language>("en");
+
+  const pinnedCount = articles.filter(
+    (article) =>
+      article.is_pinned &&
+      article.status.toLowerCase() === "published",
+  ).length;
 
   // Load articles from Supabase.
   const loadArticles = useCallback(async (initial = false) => {
@@ -53,7 +63,7 @@ export default function ManageNews() {
       const { data, error: queryError } = await supabase
         .from("news")
         .select(
-          "id, title_km, title_en, category, status, published_at, created_at",
+          "id, title_km, title_en, category, status, published_at, created_at, is_pinned",
         )
         .order("created_at", { ascending: false });
 
@@ -189,6 +199,49 @@ export default function ManageNews() {
     });
   }, [articles, search, statusFilter, categoryFilter]);
 
+  // Pin or unpin a published article.
+  async function togglePin(article: NewsArticle) {
+    if (pinningId !== null) return;
+
+    const currentlyPinned = article.is_pinned;
+
+    if (article.status.toLowerCase() !== "published") {
+      setError("Only published articles can be pinned to the Hero.");
+      return;
+    }
+
+    if (!currentlyPinned && pinnedCount >= 3) {
+      setError(
+        "You can pin a maximum of 3 published news articles. Unpin one first.",
+      );
+      return;
+    }
+
+    setPinningId(article.id);
+    setError("");
+
+    try {
+      const { error: updateError } = await supabase
+        .from("news")
+        .update({ is_pinned: !currentlyPinned })
+        .eq("id", article.id);
+
+      if (updateError) throw updateError;
+
+      await loadArticles();
+    } catch (err) {
+      console.error("Failed to update pinned news:", err);
+
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Unable to update the pinned article.",
+      );
+    } finally {
+      setPinningId(null);
+    }
+  }
+
   // Delete an article from Supabase.
   async function deleteArticle(id: string | number) {
     const confirmed = window.confirm(
@@ -288,6 +341,32 @@ export default function ManageNews() {
           </div>
         </div>
       )}
+
+      {/* Hero pin count */}
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-blue-200 bg-blue-50 p-4">
+        <div className="flex items-center gap-3">
+          <div className="rounded-lg bg-white p-2 text-blue-700">
+            <Pin size={20} />
+          </div>
+
+          <div>
+            <p className="font-semibold text-blue-950">Hero Carousel</p>
+            <p className="text-sm text-blue-800">
+              Choose up to 3 published articles for the homepage.
+            </p>
+          </div>
+        </div>
+
+        <span
+          className={`rounded-full px-4 py-2 text-sm font-bold ${
+            pinnedCount === 3
+              ? "bg-emerald-100 text-emerald-800"
+              : "bg-white text-blue-800"
+          }`}
+        >
+          {pinnedCount}/3 pinned
+        </span>
+      </div>
 
       {/* Language selector */}
       <div className="flex flex-wrap items-center gap-3">
@@ -403,13 +482,14 @@ export default function ManageNews() {
       {/* Articles table */}
       <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1050px] text-left text-sm">
+          <table className="w-full min-w-[1150px] text-left text-sm">
             <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wider text-slate-500">
               <tr>
                 <th className="px-5 py-4">Title</th>
                 <th className="px-5 py-4">Category</th>
                 <th className="px-5 py-4">Status</th>
                 <th className="px-5 py-4">Publication Date</th>
+                <th className="px-5 py-4">Hero</th>
                 <th className="px-5 py-4">Views</th>
                 <th className="px-5 py-4 text-right">Actions</th>
               </tr>
@@ -419,7 +499,7 @@ export default function ManageNews() {
               {loading ? (
                 <tr>
                   <td
-                    colSpan={6}
+                    colSpan={7}
                     className="px-5 py-16 text-center text-slate-500"
                   >
                     Loading articles from Supabase...
@@ -488,10 +568,60 @@ export default function ManageNews() {
                             : "Not published"}
                         </td>
 
+                        <td className="px-5 py-5">
+                          {article.is_pinned && isPublished ? (
+                            <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1.5 text-xs font-semibold text-amber-800">
+                              <Pin size={13} />
+                              Pinned
+                            </span>
+                          ) : (
+                            <span className="text-xs text-slate-400">
+                              Not pinned
+                            </span>
+                          )}
+                        </td>
+
                         <td className="px-5 py-5 text-slate-600">—</td>
 
                         <td className="px-5 py-5">
                           <div className="flex items-center justify-end gap-2">
+                            <button
+                              type="button"
+                              onClick={() => void togglePin(article)}
+                              disabled={
+                                pinningId !== null ||
+                                (!article.is_pinned &&
+                                  pinnedCount >= 3) ||
+                                !isPublished
+                              }
+                              title={
+                                !isPublished
+                                  ? "Only published articles can be pinned"
+                                  : article.is_pinned
+                                    ? "Remove from Hero"
+                                    : pinnedCount >= 3
+                                      ? "Unpin another article first"
+                                      : "Pin to Hero"
+                              }
+                              className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                                article.is_pinned
+                                  ? "border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100"
+                                  : "border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100"
+                              }`}
+                            >
+                              {article.is_pinned ? (
+                                <PinOff size={14} />
+                              ) : (
+                                <Pin size={14} />
+                              )}
+
+                              {pinningId === article.id
+                                ? "Saving..."
+                                : article.is_pinned
+                                  ? "Unpin"
+                                  : "Pin to Hero"}
+                            </button>
+
                             {isPublished && (
                               <Link
                                 to={`/news/${article.id}`}
@@ -534,7 +664,7 @@ export default function ManageNews() {
 
                   {filteredArticles.length === 0 && (
                     <tr>
-                      <td colSpan={6} className="px-5 py-16 text-center">
+                      <td colSpan={7} className="px-5 py-16 text-center">
                         <Newspaper
                           size={32}
                           className="mx-auto text-slate-300"

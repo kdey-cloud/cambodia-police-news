@@ -1,6 +1,6 @@
-
 import Hero from "../components/Hero";
-import NewsSection from "../components/NewsSection";
+import AnnouncementsSection from "../components/AnnouncementsSection";
+import LastNewsSection from "../components/LastNewsSection";
 import PublicInformation from "../components/PublicInformation";
 
 export default function Home() {
@@ -8,7 +8,8 @@ export default function Home() {
     <>
       <main>
         <Hero />
-        <NewsSection />
+        <LastNewsSection />
+        <AnnouncementsSection />
         <PublicInformation />
       </main>
     </>

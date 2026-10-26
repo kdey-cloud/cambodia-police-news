@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
-import { LockKeyhole, Mail, ShieldCheck } from "lucide-react";
+import { LockKeyhole, Mail } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 
 export default function AdminLogin() {
@@ -62,21 +62,26 @@ export default function AdminLogin() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-100 px-4 py-10">
+      {" "}
       <div className="w-full max-w-md">
+        {" "}
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-700 text-white shadow-lg">
-            <ShieldCheck size={34} />
+          {" "}
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center overflow-hidden">
+            {" "}
+            <img
+              src="/logo.png"
+              alt="បណ្ឌិត្យសភានគរបាលកម្ពុជា"
+              className="h-full w-full object-contain"
+            />{" "}
           </div>
-
           <h1 className="text-2xl font-bold text-slate-900">
-            Police Academy
+            បណ្ឌិត្យសភានគរបាលកម្ពុជា
           </h1>
-
           <p className="mt-2 text-sm text-slate-500">
             Content Management System
           </p>
         </div>
-
         <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-xl">
           <div className="mb-7">
             <h2 className="text-xl font-bold text-slate-900">
@@ -168,7 +173,6 @@ export default function AdminLogin() {
             </p>
           </div>
         </div>
-
         <p className="mt-6 text-center text-xs text-slate-400">
           Cambodia Police Academy · Administration
         </p>

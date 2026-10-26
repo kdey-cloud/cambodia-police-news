@@ -1,277 +1,163 @@
-import { useEffect, useState } from "react";
-import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
-import { Link } from "react-router-dom";
+import { useEffect } from "react";
+import { ArrowLeft, ArrowRight, ArrowUpRight } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { supabase } from "../lib/supabase";
-
-interface NewsArticle {
-  id: string;
-  title_km: string | null;
-  title_en: string | null;
-  image_url: string | null;
-  published_at: string | null;
-  created_at: string;
-}
+import { Link } from "react-router-dom";
 
 export default function Hero() {
   const { i18n } = useTranslation();
 
-  const isKhmer = i18n.language.startsWith("km");
+  const language = (
+    i18n.resolvedLanguage ||
+    i18n.language ||
+    "en"
+  ).toLowerCase();
 
-  const [featuredNews, setFeaturedNews] = useState<NewsArticle[]>([]);
-  const [activeIndex, setActiveIndex] = useState(0);
-  const [paused, setPaused] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const isKhmer = language.startsWith("kh") || language.startsWith("km");
 
-  // Load published news directly from Supabase.
   useEffect(() => {
-    let isMounted = true;
-
-    async function loadFeaturedNews() {
-      setLoading(true);
-
-      const { data, error } = await supabase
-        .from("news")
-        .select("id, title_km, title_en, image_url, published_at, created_at")
-        .eq("status", "published")
-        .order("published_at", {
-          ascending: false,
-          nullsFirst: false,
-        })
-        .order("created_at", { ascending: false })
-        .limit(3);
-
-      if (!isMounted) return;
-
-      if (error) {
-        console.error("Failed to load featured news:", error);
-        setFeaturedNews([]);
-      } else {
-        setFeaturedNews(data ?? []);
-      }
-
-      setActiveIndex(0);
-      setLoading(false);
-    }
-
-    loadFeaturedNews();
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
-  // Automatically change slides.
-  useEffect(() => {
-    if (paused || featuredNews.length <= 1) return;
-
-    const timer = window.setInterval(() => {
-      setActiveIndex((current) => (current + 1) % featuredNews.length);
-    }, 5000);
-
-    return () => window.clearInterval(timer);
-  }, [paused, featuredNews.length]);
-
-  const nextSlide = () => {
-    setActiveIndex((current) => (current + 1) % featuredNews.length);
-  };
-
-  const previousSlide = () => {
-    setActiveIndex(
-      (current) => (current - 1 + featuredNews.length) % featuredNews.length,
-    );
-  };
-
-  function getTitle(article: NewsArticle) {
-    if (isKhmer) {
-      return article.title_km?.trim() || article.title_en?.trim() || "ព័ត៌មាន";
-    }
-
-    return article.title_en?.trim() || article.title_km?.trim() || "News";
-  }
-
-  function formatDate(article: NewsArticle) {
-    const date = article.published_at || article.created_at;
-
-    if (!date) return "";
-
-    return new Intl.DateTimeFormat(isKhmer ? "km-KH" : "en-GB", {
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-    }).format(new Date(date));
-  }
-
-  if (loading) {
-    return (
-      <section className="bg-slate-50 py-5 sm:py-7 md:py-9">
-        <div className="mx-auto max-w-7xl px-3 sm:px-5">
-          <div className="flex h-[300px] items-center justify-center rounded-xl bg-white shadow-sm sm:h-[380px] md:h-[430px]">
-            <p className="text-sm text-slate-500">
-              {isKhmer ? "កំពុងផ្ទុកព័ត៌មាន..." : "Loading news..."}
-            </p>
-          </div>
-        </div>
-      </section>
-    );
-  }
-
-  if (featuredNews.length === 0) {
-    return (
-      <section className="bg-slate-50 py-5 sm:py-7 md:py-9">
-        <div className="mx-auto max-w-7xl px-3 sm:px-5">
-          <div className="flex h-[200px] items-center justify-center rounded-xl bg-white shadow-sm">
-            <p className="text-sm text-slate-500">
-              {isKhmer
-                ? "មិនទាន់មានព័ត៌មានដែលបានផ្សព្វផ្សាយទេ។"
-                : "No published news available yet."}
-            </p>
-          </div>
-        </div>
-      </section>
-    );
-  }
+    document.documentElement.lang = isKhmer ? "km" : "en";
+  }, [isKhmer]);
 
   return (
-    <section className="bg-slate-50 py-5 sm:py-7 md:py-9">
-      <div className="mx-auto max-w-7xl px-3 sm:px-5">
-        {/* Featured news slider */}
-        <div
-          className="relative overflow-hidden rounded-xl bg-white shadow-md sm:rounded-2xl"
-          onMouseEnter={() => setPaused(true)}
-          onMouseLeave={() => setPaused(false)}
-          onFocusCapture={() => setPaused(true)}
-          onBlurCapture={(event) => {
-            if (
-              !event.currentTarget.contains(event.relatedTarget as Node | null)
-            ) {
-              setPaused(false);
-            }
-          }}
-          aria-roledescription="carousel"
-          aria-label="Featured news"
-        >
-          <div className="relative h-[320px] sm:h-[400px] md:h-[480px] lg:h-[560px] xl:h-[620px] 2xl:h-[680px]">
-            {featuredNews.map((article, index) => (
+    <section
+      className="
+        relative isolate flex items-center overflow-hidden
+        bg-slate-950 text-white
+        xl:min-h-[calc(100svh-128px)]
+      "
+    >
+      {/* Background image */}
+
+      <div className="absolute inset-0 -z-20">
+        <img
+          src="/hero-academy.jpg"
+          alt=""
+          className="
+      h-full w-full object-cover object-center
+      [mask-image:linear-gradient(to_bottom,black_calc(10%-20px),transparent_100%)]
+    "
+        />
+      </div>
+
+      {/* Dark overlay */}
+      <div className="absolute inset-0 -z-10 bg-gradient-to-r from-blue-950/95 via-blue-950/85 to-slate-950/50" />
+
+      {/* Main content */}
+      <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-8 sm:py-10 xl:px-12 xl:py-8">
+        <div className="max-w-4xl">
+          {/* Academy name */}
+          <div
+            className={`mb-3 inline-flex items-center gap-2 sm:mb-4 sm:gap-3 ${
+              isKhmer ? "font-khmer" : "font-english"
+            }`}
+          >
+            <span className="h-[2px] w-5 shrink-0 bg-amber-400 sm:w-8" />
+
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-amber-300 sm:text-sm sm:tracking-[0.15em]">
+              {isKhmer
+                ? "បណ្ឌិត្យសភានគរបាលកម្ពុជា"
+                : "POLICE ACADEMY OF CAMBODIA"}
+            </span>
+          </div>
+
+          {/* Heading */}
+          <h1
+            className={`max-w-4xl text-2xl font-normal leading-snug sm:text-4xl sm:leading-[1.35] xl:text-5xl ${
+              isKhmer ? "font-moul" : "font-english font-extrabold"
+            }`}
+          >
+            {isKhmer ? (
+              <>
+                បម្រើសហគមន៍
+                <br />
+                ការពារអនាគត
+              </>
+            ) : (
+              <>
+                Serving the Community.
+                <br />
+                <span className="text-amber-300">Protecting the Future.</span>
+              </>
+            )}
+          </h1>
+
+          {/* Description */}
+          <p
+            className={`mt-3 max-w-2xl text-xs leading-6 text-blue-50/90 sm:mt-4 sm:text-base sm:leading-8 ${
+              isKhmer ? "font-khmer" : "font-english"
+            }`}
+          >
+            {isKhmer
+              ? "បណ្ឌិត្យសភានគរបាលកម្ពុជា ប្តេជ្ញាចិត្តក្នុងការអប់រំ បណ្តុះបណ្តាល និងអភិវឌ្ឍសមត្ថភាពមន្ត្រីនគរបាល ដើម្បីបម្រើប្រជាពលរដ្ឋ និងរក្សាសន្តិសុខសង្គម។"
+              : "The Police Academy of Cambodia is committed to educating, training, and developing professional police officers dedicated to serving the people and protecting public safety."}
+          </p>
+
+          {/* Buttons */}
+          <div className="mt-4 flex flex-col gap-2 min-[380px]:flex-row sm:mt-5 sm:gap-3">
+            <Link
+              to="/institution"
+              className={`group inline-flex min-h-9 items-center justify-center gap-2 bg-amber-400 px-4 py-2 text-xs font-bold text-blue-950 transition hover:bg-amber-300 sm:min-h-11 sm:px-5 sm:py-2.5 sm:text-sm ${
+                isKhmer ? "font-khmer" : "font-english"
+              }`}
+            >
+              {isKhmer ? "ស្វែងយល់បន្ថែម" : "Learn More"}
+
+              <ArrowUpRight
+                size={15}
+                className="shrink-0 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5 sm:h-[17px] sm:w-[17px]"
+              />
+            </Link>
+
+            <Link
+              to="/public-information"
+              className={`inline-flex min-h-9 items-center justify-center border border-white/50 px-4 py-2 text-xs font-semibold text-white transition hover:border-white hover:bg-white/10 sm:min-h-11 sm:px-5 sm:py-2.5 sm:text-sm ${
+                isKhmer ? "font-khmer" : "font-english"
+              }`}
+            >
+              {isKhmer ? "ព័ត៌មានសាធារណៈ" : "Public Information"}
+            </Link>
+          </div>
+
+          {/* Core values */}
+          <div className="mt-5 grid max-w-md grid-cols-3 border-t border-white/10 pt-3 sm:mt-8 sm:pt-4">
+            {[
+              { en: "DISCIPLINE", kh: "វិន័យ" },
+              { en: "INTEGRITY", kh: "សុចរិតភាព" },
+              { en: "SERVICE", kh: "សេវាកម្ម" },
+            ].map((value, index) => (
               <div
-                key={article.id}
-                aria-hidden={index !== activeIndex}
-                className={`absolute inset-0 transition-all duration-700 ease-in-out ${
-                  index === activeIndex
-                    ? "translate-x-0 opacity-100"
-                    : index < activeIndex
-                      ? "-translate-x-full opacity-0"
-                      : "translate-x-full opacity-0"
-                }`}
+                key={value.en}
+                className={`min-w-0 px-2 first:pl-0 sm:px-3 ${
+                  index !== 0 ? "border-l border-white/20 pl-3" : ""
+                } ${isKhmer ? "font-khmer" : "font-english"}`}
               >
-                {/* News image */}
-                {article.image_url ? (
-                  <img
-                    src={article.image_url}
-                    alt={getTitle(article)}
-                    loading={index === 0 ? "eager" : "lazy"}
-                    className="absolute inset-0 h-full w-full object-cover object-center"
-                  />
-                ) : (
-                  <div className="absolute inset-0 bg-gradient-to-br from-blue-900 to-slate-900" />
-                )}
 
-                {/* Image overlay */}
-                <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-900/35 to-transparent" />
-
-                {/* News information */}
-                <div className="absolute inset-x-0 bottom-0 p-4 pb-8 text-white sm:p-7 sm:pb-8 md:p-10 md:pb-8 lg:p-12 lg:pb-8">
-                  <div className="mb-3 flex items-center gap-2 text-xs text-white/85 sm:text-sm">
-                    <CalendarDays size={15} />
-                    <time>{formatDate(article)}</time>
-                  </div>
-                  <Link
-                    to={`/news/${article.id}`}
-                    tabIndex={index === activeIndex ? 0 : -1}
-                    className="line-clamp-2 text-xl font-bold leading-snug sm:text-2xl md:line-clamp-3 md:text-3xl lg:text-4xl"
-                  >
-                    {getTitle(article)}
-                  </Link>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Previous and next buttons */}
-          {featuredNews.length > 1 && (
-            <>
-              <button
-                type="button"
-                onClick={previousSlide}
-                aria-label="Previous news"
-                className="absolute left-3 top-1/2 z-20 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/95 text-slate-800 shadow-md transition hover:bg-white hover:text-[#1D4ED8] sm:left-5 sm:h-11 sm:w-11"
-              >
-                <ChevronLeft size={21} />
-              </button>
-
-              <button
-                type="button"
-                onClick={nextSlide}
-                aria-label="Next news"
-                className="absolute right-3 top-1/2 z-20 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/95 text-slate-800 shadow-md transition hover:bg-white hover:text-[#1D4ED8] sm:right-5 sm:h-11 sm:w-11"
-              >
-                <ChevronRight size={21} />
-              </button>
-
-              {/* Navigation dots */}
-              <div className="absolute bottom-4 left-0 right-0 z-20 flex justify-center gap-2">
-                {featuredNews.map((article, index) => (
-                  <button
-                    key={article.id}
-                    type="button"
-                    onClick={() => setActiveIndex(index)}
-                    aria-label={`Show news ${index + 1}`}
-                    aria-current={index === activeIndex ? "true" : undefined}
-                    className={`h-2 rounded-full transition-all duration-300 ${
-                      index === activeIndex
-                        ? "w-7 bg-white"
-                        : "w-2 bg-white/60 hover:bg-white/90"
-                    }`}
-                  />
-                ))}
-              </div>
-            </>
-          )}
-        </div>
-
-        {/* News preview cards */}
-        {featuredNews.length > 1 && (
-          <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
-            {featuredNews.map((article, index) => (
-              <button
-                key={article.id}
-                type="button"
-                onClick={() => setActiveIndex(index)}
-                aria-pressed={index === activeIndex}
-                className={`flex min-w-0 items-center gap-3 overflow-hidden rounded-xl border bg-white p-3 text-left transition duration-200 hover:shadow-sm ${
-                  index === activeIndex
-                    ? "border-[#1D4ED8] shadow-sm"
-                    : "border-slate-200 hover:border-slate-300"
-                }`}
-              >
-                {article.image_url ? (
-                  <img
-                    src={article.image_url}
-                    alt=""
-                    loading="lazy"
-                    className="h-16 w-24 shrink-0 rounded-lg object-cover"
-                  />
-                ) : (
-                  <div className="h-16 w-24 shrink-0 rounded-lg bg-slate-200" />
-                )}
-
-                <span className="line-clamp-2 text-sm font-semibold leading-5 text-slate-800">
-                  {getTitle(article)}
+                <span className="break-words text-[9px] font-semibold sm:text-sm">
+                  {isKhmer ? value.kh : value.en}
                 </span>
-              </button>
+              </div>
             ))}
           </div>
-        )}
+        </div>
+      </div>
+
+      {/* Desktop arrows */}
+      <div className="absolute bottom-5 right-5 hidden items-center gap-2 sm:flex xl:right-12">
+        <button
+          type="button"
+          aria-label="Previous slide"
+          className="flex h-9 w-9 items-center justify-center border border-white/40 text-white/80 transition hover:border-amber-400 hover:bg-amber-400 hover:text-blue-950"
+        >
+          <ArrowLeft size={17} />
+        </button>
+
+        <button
+          type="button"
+          aria-label="Next slide"
+          className="flex h-9 w-9 items-center justify-center border border-white/40 text-white/80 transition hover:border-amber-400 hover:bg-amber-400 hover:text-blue-950"
+        >
+          <ArrowRight size={17} />
+        </button>
       </div>
     </section>
   );

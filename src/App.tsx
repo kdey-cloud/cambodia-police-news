@@ -3,11 +3,13 @@ import { Routes, Route } from "react-router-dom";
 
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
+import ScrollToTop from "./components/ScrollToTop";
 
 import AdminProtectedRoute from "./components/AdminProtectedRoute";
 import AdminLogin from "./pages/admin/AdminLogin";
 
 import Home from "./pages/Home";
+import News from "./pages/News"
 import NewsDetail from "./pages/NewsDetail";
 import Search from "./pages/Search";
 import Background from "./pages/Background";
@@ -21,11 +23,14 @@ import CreateNews from "./pages/admin/CreateNews";
 function PublicLayout() {
   return (
     <div className="flex min-h-screen flex-col">
+      <ScrollToTop />
+
       <Navbar />
 
       <main className="flex-1">
         <Routes>
           <Route path="/" element={<Home />} />
+          <Route path="/news" element={<News />} />
           <Route path="/news/:id" element={<NewsDetail />} />
           <Route path="/search" element={<Search />} />
           <Route

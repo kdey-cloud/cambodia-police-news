@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import {
@@ -11,7 +10,6 @@ import {
   X,
   Search,
   Bell,
-  ShieldCheck,
   LogOut,
   LoaderCircle,
 } from "lucide-react";
@@ -94,33 +92,44 @@ export default function AdminLayout() {
       {/* Top navigation */}
       <header className="fixed inset-x-0 top-0 z-40 flex h-14 items-center justify-between bg-slate-800 px-3 text-white shadow-md sm:px-6">
         {/* Brand */}
-        <div className="flex shrink-0 items-center gap-3">
+
+        <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+          {/* Mobile sidebar button */}
           <button
             type="button"
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="rounded-md p-2 transition hover:bg-slate-700 lg:hidden"
+            className="shrink-0 rounded-md p-2 transition hover:bg-slate-700 lg:hidden"
             aria-label="Toggle sidebar"
           >
             {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
 
-          <ShieldCheck size={25} className="text-blue-400" />
+          {/* Logo */}
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl">
+            <img
+              src="/logo.png"
+              alt="Police Academy Logo"
+              className="h-full w-full object-contain"
+            />
+          </div>
 
-          <span className="text-sm font-bold sm:text-base">
-            Police Academy
-            <span className="ml-2 hidden font-normal text-slate-300 sm:inline">
+          {/* Title */}
+          <div className="flex min-w-0 items-center gap-2">
+            <span className="truncate text-sm font-bold leading-tight sm:text-base">
+              បណ្ឌិត្យសភានគរបាលកម្ពុជា
+            </span>
+
+            <span className="hidden shrink-0 text-sm font-normal text-slate-300 sm:inline">
               Admin
             </span>
-          </span>
+          </div>
         </div>
 
         {/* Search */}
         <div className="hidden max-w-sm flex-1 px-8 md:block">
           <div className="flex items-center gap-2 rounded-md border border-slate-600 bg-slate-700 px-3 py-2">
             <Search size={17} className="text-slate-300" />
-            <span className="text-sm text-slate-300">
-              Admin dashboard
-            </span>
+            <span className="text-sm text-slate-300">Admin dashboard</span>
           </div>
         </div>
 
@@ -138,9 +147,7 @@ export default function AdminLayout() {
             AD
           </div>
 
-          <span className="hidden text-sm sm:inline">
-            Administrator
-          </span>
+          <span className="hidden text-sm sm:inline">Administrator</span>
 
           <div className="mx-1 h-7 w-px bg-slate-600" />
 
@@ -222,9 +229,7 @@ export default function AdminLayout() {
 
         <div className="mx-4 mt-4 rounded-lg border border-slate-700 p-3">
           <p className="text-xs text-slate-400">Website language</p>
-          <p className="mt-1 text-sm font-medium">
-            Khmer / English
-          </p>
+          <p className="mt-1 text-sm font-medium">Khmer / English</p>
         </div>
       </aside>
 
@@ -246,4 +251,3 @@ export default function AdminLayout() {
     </div>
   );
 }
-

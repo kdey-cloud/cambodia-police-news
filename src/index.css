@@ -1,114 +1,131 @@
-
 @import url("https://fonts.googleapis.com/css2?family=Battambang:wght@400;700&family=Inter:wght@400;500;600;700;800&family=Moul&display=swap");
 
 @import "tailwindcss";
 
 /* ========================================
-   GLOBAL RESET
+GLOBAL RESET
 ======================================== */
 
 * {
   box-sizing: border-box;
-}
+  }
 
 html {
-  scroll-behavior: smooth;
+scroll-behavior: smooth;
 }
 
 body {
-  margin: 0;
-  min-width: 320px;
-  min-height: 100vh;
+margin: 0;
+min-width: 320px;
+min-height: 100vh;
 
-  font-family: "Inter", "Battambang", sans-serif;
+font-family: "Inter", "Battambang", sans-serif;
 
-  background: #f8fafc;
-  color: #0f172a;
+background: #f8fafc;
+color: #0f172a;
 }
 
 /* ========================================
-   LANGUAGE FONTS
+LANGUAGE FONTS
 ======================================== */
 
-/* English font */
+/* English interface: Inter with Khmer fallback */
 html[lang="en"] body {
-  font-family: "Inter", sans-serif;
+font-family: "Inter", "Battambang", sans-serif;
 }
 
-/* Khmer font */
+/* Khmer interface */
 html[lang="km"] body {
-  font-family: "Battambang", sans-serif;
+font-family: "Battambang", sans-serif;
+}
+
+/* Keep Khmer text in Battambang in either language */
+.font-khmer {
+font-family: "Battambang", sans-serif !important;
+}
+
+/* Keep English text in Inter in either language */
+.font-english {
+font-family: "Inter", sans-serif !important;
 }
 
 /* Khmer Moul font for special headings */
 .font-moul {
-  font-family: "Moul", serif;
-  font-weight: 400;
+font-family: "Moul", serif !important;
+font-weight: 400;
 }
 
 /* ========================================
-   NAVIGATION FONT
-   Main menu, submenu, nested submenu
+NAVIGATION FONT
+Main menu, submenu, nested submenu
 ======================================== */
 
-/* English navigation */
+/* English navigation with Khmer fallback */
 html[lang="en"] nav,
 html[lang="en"] nav *,
 html:not([lang="km"]) nav,
 html:not([lang="km"]) nav * {
-  font-family: "Inter", sans-serif;
+font-family: "Inter", "Battambang", sans-serif;
 }
 
 /* Khmer navigation */
 html[lang="km"] nav,
 html[lang="km"] nav * {
-  font-family: "Battambang", sans-serif;
+font-family: "Battambang", sans-serif;
 }
 
 /* ========================================
-   PRIMARY COLORS
+PRIMARY COLORS
 ======================================== */
 
 :root {
-  --primary-color: #012fd6;
+--primary-color: #012fd6;
 }
 
 .primary-background-color {
-  background-color: var(--primary-color);
+background-color: var(--primary-color);
 }
 
 .primary-text-color {
-  color: var(--primary-color);
+color: var(--primary-color);
 }
 
 /* ========================================
-   OPTIONAL: CONSISTENT NAVIGATION TYPOGRAPHY
+CONSISTENT NAVIGATION TYPOGRAPHY
 ======================================== */
 
 /* Main menu links and buttons */
 nav a,
 nav button {
-  font-size: inherit;
-  line-height: inherit;
+font-size: inherit;
+line-height: inherit;
 }
+
+/* ========================================
+FORM CONTROLS
+======================================== */
 
 /* Prevent form controls from using browser fonts */
 button,
 input,
 textarea,
 select {
-  font: inherit;
+font: inherit;
 }
 
 /* ========================================
-   RESPONSIVE IMAGES
+RESPONSIVE IMAGES
 ======================================== */
 
 img {
-  max-width: 100%;
-  height: auto;
+max-width: 100%;
+height: auto;
 }
 
+/* ========================================
+NAVIGATION LIST ITEMS
+======================================== */
+
 nav li {
-  font-family: "Inter", "Battambang", sans-serif;
+font-family: "Inter", "Battambang", sans-serif;
 }
