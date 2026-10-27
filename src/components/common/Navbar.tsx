@@ -13,8 +13,7 @@ import {
 } from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import LanguageSwitcher from "./LanguageSwitcher";
-
+import LanguageSwitcher from "../Home/LanguageSwitcher";
 
 type SubmenuLink = {
   label: string;
@@ -401,18 +400,15 @@ export default function Navbar() {
     );
   };
 
+  const openSearch = () => {
+    if (location.pathname === "/search") {
+      navigate(-1);
+    } else {
+      navigate("/search");
+    }
 
-const openSearch = () => {
-  if (location.pathname === "/search") {
-    navigate(-1);
-  } else {
-    navigate("/search");
-  }
-
-  closeMenus();
-};
-
-
+    closeMenus();
+  };
 
   const shareToFacebook = () => {
     const url = encodeURIComponent(window.location.href);

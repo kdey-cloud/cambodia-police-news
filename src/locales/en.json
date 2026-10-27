@@ -1,6 +1,10 @@
 
 {
   "home": "Home",
+  
+  "latestNews": "Latest News",
+  
+
   "institution": "Institution",
   "structure": "Structure",
   "studyProgram": "Study Program",
@@ -144,7 +148,93 @@
     "aboutAcademy": "About the Academy",
     "aboutDescription": "Learn more about the Police Academy of Cambodia and its educational activities.",
     "returnHome": "Return Home"
+  },
+
+"roles": {
+  "home": "Home",
+  "institution": "Institution",
+  "title": "Roles and Responsibilities",
+  "date": "Wednesday, 18 September, 2019",
+  "views": "Views (3.2K)",
+
+  "overviewTitle": "Roles and Responsibilities",
+  "introduction": "The Police Academy of Cambodia is a public educational institution with a status equivalent to a General Department. It serves as an advisory body to the Minister of Interior on police science research in the fields of security, public order, and the training of national police personnel and prison officials throughout the country.",
+
+  "responsibilitiesTitle": "Institutional Structure and Responsibilities",
+  "responsibility1Title": "Police Science Research",
+  "responsibility1Description": "Conduct research in police science, security, and public order to support the work of the Ministry of Interior.",
+  "responsibility2Title": "Training and Education",
+  "responsibility2Description": "Provide training and professional development for national police personnel and prison officials throughout Cambodia.",
+  "responsibility3Title": "Institutional Organization",
+  "responsibility3Description": "The Police Academy of Cambodia has 10 subordinate units at department-equivalent level and one department.",
+  "responsibility4Title": "Reporting and Advisory Responsibilities",
+  "responsibility4Description": "The Academy has the authority to report directly to and consult with the Minister of Interior.",
+
+  "regionalSchoolsTitle": "National Police Schools",
+  "regionalSchoolsDescription": "The Academy has seven police training schools across the provinces, including the Cambodia–Vietnam Friendship National Police School.",
+  "school": "School",
+  "province1": "Regional Police School 1 — Stung Treng Province",
+  "province2": "Regional Police School 2 — Kampong Cham Province",
+  "province3": "Regional Police School 3 — Kampong Speu Province",
+  "province4": "Regional Police School 4 — Siem Reap Province",
+  "province5": "Regional Police School 5 — Battambang Province",
+
+  "commitmentTitle": "Additional Training Institutions",
+  "commitmentDescription": "The Academy's training network also includes Regional Police School 6 in Kampong Chhnang Province and the Cambodia–Vietnam Friendship National Police School in Kampong Speu Province.",
+
+  "lastNews": "Latest News",
+  "latestUpdates": "News and announcements",
+  "news1Title": "Police Academy News and Activities",
+  "news1Category": "Activities",
+  "news2Title": "Training and Education Announcements",
+  "news2Category": "Announcements",
+  "news3Title": "Meetings and Cooperation",
+  "news3Category": "Meetings",
+  "readMore": "Read more",
+
+  "aboutAcademy": "About the Academy",
+  "aboutDescription": "Learn about the Police Academy of Cambodia, its history, responsibilities, and professional training mission.",
+  "returnHome": "Return to Home"
+},
+
+  "strategic": {
+    "home": "Home",
+    "institution": "Police Academy of Cambodia",
+    "title": "Strategic",
+    "date": "Saturday, 12 July, 2025",
+    "views": "Views (202)",
+    "sectionTitle": "Strategic",
+    "introduction": "To achieve the established vision, objectives, and goals, the Police Academy of Cambodia has outlined the following strategies:",
+    "strategiesTitle": "Strategic Directions",
+    "strategy1": "Strengthening leadership and management capabilities in line with good government principles.",
+    "strategy2": "Enhancing the efficiency of financial management.",
+    "strategy3": "Strengthening and expanding national and international cooperation.",
+    "strategy4": "Promoting gender equality.",
+    "strategy5": "Developing and internationalizing educational programs.",
+    "strategy6": "Developing the capacity of professors and national police instructors, and selecting successor national police instructors.",
+    "strategy7": "Developing educational and physical resources.",
+    "strategy8": "Strengthening mechanisms to ensure educational quality.",
+    "strategy9": "Defining the scope of training.",
+    "strategy10": "Developing the capacity of officers and enhancing the efficiency of research.",
+    "strategy11": "Promoting and expanding the scope of police science research.",
+    "conclusion": "These strategies guide the Police Academy of Cambodia in developing its educational programs, strengthening institutional capacity, and advancing police science research.",
+    "latestNews": "Latest News",
+    "latestUpdates": "Latest updates from the academy",
+    "news1Title": "Latest Academy News",
+    "news1Category": "News",
+    "news2Title": "Academy Announcements",
+    "news2Category": "Announcement",
+    "news3Title": "Academy Activities",
+    "news3Category": "Activities",
+    "readMore": "Read more",
+    "aboutAcademy": "About the Academy",
+    "aboutDescription": "The Police Academy of Cambodia provides education and training and supports the development of professional police personnel.",
+    "returnHome": "Return Home"
   }
 }
+
+
+
+
 
 

@@ -1,12 +1,12 @@
 import { Mail, MapPin, Phone } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useEffect, useState } from "react";
-import { supabase } from "../lib/supabase";
-import facebookIcon from "../assets/social/Facebook-300x300.png"
-import youtubeIcon from "../assets/social/youtube-300x300.png"
-import telegramIcon from "../assets/social/Telegram_logo.svg_-150x150.png"
-import tiktokIcon from "../assets/social/titokicon-300x300.png"
-import coolappIcon from "../assets/social/CoolApp_Logo512x512.png"
+import { supabase } from "../../lib/supabase";
+import facebookIcon from "../../assets/social/Facebook-300x300.png"
+import youtubeIcon from "../../assets/social/youtube-300x300.png"
+import telegramIcon from "../../assets/social/Telegram_logo.svg_-150x150.png"
+import tiktokIcon from "../../assets/social/titokicon-300x300.png"
+import coolappIcon from "../../assets/social/CoolApp_Logo512x512.png"
 
 export default function Footer() {
   const { t } = useTranslation();

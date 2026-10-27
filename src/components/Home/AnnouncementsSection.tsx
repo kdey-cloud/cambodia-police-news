@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { supabase } from "../lib/supabase";
+import { supabase } from "../../lib/supabase";
 
 interface NewsArticle {
   id: string;
@@ -16,7 +16,7 @@ interface NewsArticle {
 export default function Hero() {
   const { i18n } = useTranslation();
 
-  const isKhmer = i18n.language.startsWith("km");
+  const isKhmer = i18n.language.startsWith("kh");
 
   const [featuredNews, setFeaturedNews] = useState<NewsArticle[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -136,6 +136,24 @@ export default function Hero() {
   return (
     <section className="bg-slate-50 py-5 sm:py-7 md:py-9">
       <div className="mx-auto max-w-7xl px-3 sm:px-5">
+        {/* Announcement Heading */}{" "}
+        <div className="mb-5 flex items-center gap-3">
+          {" "}
+          <div className="h-8 w-1 rounded-full bg-blue-900" />{" "}
+          <div>
+            {" "}
+            <h2 className="text-xl font-bold text-slate-900 sm:text-2xl">
+              {" "}
+              {isKhmer ? "សេចក្តីប្រកាស" : "Announcement"}{" "}
+            </h2>{" "}
+            <p className="mt-1 text-xs text-slate-500 sm:text-sm">
+              {" "}
+              {isKhmer
+                ? "ព័ត៌មាន និងសេចក្តីជូនដំណឹងសំខាន់ៗ"
+                : "Important news and updates from the academy"}{" "}
+            </p>{" "}
+          </div>{" "}
+        </div>
         {/* Featured news slider */}
         <div
           className="relative overflow-hidden rounded-xl bg-white shadow-md sm:rounded-2xl"
@@ -240,7 +258,6 @@ export default function Hero() {
             </>
           )}
         </div>
-
         {/* News preview cards */}
         {featuredNews.length > 1 && (
           <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">

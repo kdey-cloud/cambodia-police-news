@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Navigate } from "react-router-dom";
-import { supabase } from "../lib/supabase";
+import { supabase } from "../../lib/supabase";
 
 interface AdminProtectedRouteProps {
   children: ReactNode;
@@ -58,7 +58,9 @@ export default function AdminProtectedRoute({
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-50">
-        <p className="text-sm text-slate-500">Checking administrator access...</p>
+        <p className="text-sm text-slate-500">
+          Checking administrator access...
+        </p>
       </div>
     );
   }

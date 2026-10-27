@@ -1,18 +1,20 @@
-
 import { Routes, Route } from "react-router-dom";
 
-import Navbar from "./components/Navbar";
-import Footer from "./components/Footer";
-import ScrollToTop from "./components/ScrollToTop";
+import Navbar from "./components/common/Navbar";
+import Footer from "./components/common/Footer";
+import ScrollToTop from "./components/common/ScrollToTop";
 
-import AdminProtectedRoute from "./components/AdminProtectedRoute";
+import AdminProtectedRoute from "./components/admin/AdminProtectedRoute";
 import AdminLogin from "./pages/admin/AdminLogin";
 
 import Home from "./pages/Home";
-import News from "./pages/News"
+import News from "./pages/News";
 import NewsDetail from "./pages/NewsDetail";
 import Search from "./pages/Search";
-import Background from "./pages/Background";
+import Background from "./pages/institution/Background";
+import RolesAndResponsibilities from "./pages/institution/RolesAndResponsibilities";
+import Strategic from "./pages/institution/Strategic";
+import CompositionAndLeadership from "./pages/structure/Composition-And-Leadership";
 
 // Admin pages
 import AdminLayout from "./layouts/AdminLayout";
@@ -33,10 +35,10 @@ function PublicLayout() {
           <Route path="/news" element={<News />} />
           <Route path="/news/:id" element={<NewsDetail />} />
           <Route path="/search" element={<Search />} />
-          <Route
-            path="/institution/background"
-            element={<Background />}
-          />
+          <Route path="/institution/background" element={<Background />} />
+          <Route path="/institution/roles-and-responsibilities" element={<RolesAndResponsibilities />} />
+          <Route path="/institution/strategy" element={<Strategic />} />
+          <Route path="/pac-leadership" element={<CompositionAndLeadership />} />
         </Routes>
       </main>
 
@@ -71,4 +73,3 @@ export default function App() {
     </Routes>
   );
 }
-
