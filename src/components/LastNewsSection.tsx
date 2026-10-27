@@ -77,48 +77,48 @@ export default function NewsSection() {
           </h2>
 
           <div>
-            {loading && (
-              <p className="py-4 text-sm text-gray-500">
-                {isKhmer ? "កំពុងផ្ទុកព័ត៌មាន..." : "Loading news..."}
-              </p>
-            )}
+{!loading &&
+  !error &&
+  newsArticles.map((article) => (
+    <article
+      key={article.id}
+      className="border-b border-gray-200 py-4 transition hover:bg-gray-50"
+    >
+      <Link
+        to={`/news/${article.id}`}
+        className="flex items-start gap-4"
+      >
+        {/* News Image - Left */}
+        <div className="h-20 w-28 flex-shrink-0 overflow-hidden rounded-md bg-gray-100 sm:h-24 sm:w-36">
+          {article.image_url ? (
+            <img
+              src={article.image_url}
+              alt={getTitle(article)}
+              className="h-full w-full object-cover transition duration-300 hover:scale-105"
+              loading="lazy"
+            />
+          ) : (
+            <div className="flex h-full items-center justify-center text-gray-400">
+              <Camera size={24} />
+            </div>
+          )}
+        </div>
 
-            {!loading && error && (
-              <p className="py-4 text-sm text-red-600">
-                {isKhmer
-                  ? "មិនអាចផ្ទុកព័ត៌មានបានទេ។"
-                  : "Unable to load news."}
-              </p>
-            )}
+        {/* News Title and Date - Right */}
+        <div className="min-w-0 flex-1">
+          <div className="mb-2 flex items-center gap-2 text-xs text-gray-500">
+            <CalendarDays size={13} className="flex-shrink-0" />
+            <time>{getDate(article)}</time>
+          </div>
 
-            {!loading && !error && newsArticles.length === 0 && (
-              <p className="py-4 text-sm text-gray-500">
-                {isKhmer
-                  ? "មិនទាន់មានព័ត៌មានទេ។"
-                  : "No news available."}
-              </p>
-            )}
+          <h3 className="line-clamp-3 text-sm font-semibold leading-6 text-gray-900 transition hover:text-blue-800 sm:text-base">
+            {getTitle(article)}
+          </h3>
+        </div>
+      </Link>
+    </article>
+  ))}
 
-            {!loading &&
-              !error &&
-              newsArticles.map((article) => (
-                <article
-                  key={article.id}
-                  className="border-b border-gray-300 py-3 transition hover:bg-gray-50"
-                >
-                  <div className="mb-1 flex items-center gap-2 text-xs text-gray-500">
-                    <CalendarDays size={13} />
-                    <time>{getDate(article)}</time>
-                    <Camera size={13} />
-                  </div>
-
-                  <h3 className="text-sm font-semibold leading-6 text-gray-900 hover:text-blue-800">
-                    <Link to={`/news/${article.id}`}>
-                      {getTitle(article)}
-                    </Link>
-                  </h3>
-                </article>
-              ))}
           </div>
 
           <Link
