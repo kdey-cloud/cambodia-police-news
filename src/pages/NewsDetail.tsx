@@ -15,11 +15,11 @@ import { supabase } from "../lib/supabase";
 
 type NewsArticle = {
   id: string;
-  title_km: string | null;
+  title_kh: string | null;
   title_en: string | null;
-  summary_km: string | null;
+  summary_kh: string | null;
   summary_en: string | null;
-  content_km: string | null;
+  content_kh: string | null;
   content_en: string | null;
   image_url: string | null;
   category: string | null;
@@ -45,7 +45,7 @@ type GalleryImage = {
 
 type RecentArticle = {
   id: string;
-  title_km: string | null;
+  title_kh: string | null;
   title_en: string | null;
   image_url: string | null;
   category: string | null;
@@ -61,7 +61,7 @@ function formatDate(dateString: string | null, language: string) {
   if (Number.isNaN(date.getTime())) return "";
 
   return new Intl.DateTimeFormat(
-    language.toLowerCase().startsWith("km") ? "km-KH" : "en-GB",
+    language.toLowerCase().startsWith("kh") ? "kh-KH" : "en-GB",
     {
       year: "numeric",
       month: "long",
@@ -71,30 +71,30 @@ function formatDate(dateString: string | null, language: string) {
 }
 
 function getTitle(
-  article: Pick<NewsArticle, "title_km" | "title_en">,
+  article: Pick<NewsArticle, "title_kh" | "title_en">,
   isKhmer: boolean,
 ) {
   return isKhmer
-    ? article.title_km?.trim() || article.title_en?.trim() || ""
-    : article.title_en?.trim() || article.title_km?.trim() || "";
+    ? article.title_kh?.trim() || article.title_en?.trim() || ""
+    : article.title_en?.trim() || article.title_kh?.trim() || "";
 }
 
 function getSummary(
-  article: Pick<NewsArticle, "summary_km" | "summary_en">,
+  article: Pick<NewsArticle, "summary_kh" | "summary_en">,
   isKhmer: boolean,
 ) {
   return isKhmer
-    ? article.summary_km?.trim() || article.summary_en?.trim() || ""
-    : article.summary_en?.trim() || article.summary_km?.trim() || "";
+    ? article.summary_kh?.trim() || article.summary_en?.trim() || ""
+    : article.summary_en?.trim() || article.summary_kh?.trim() || "";
 }
 
 function getContent(
-  article: Pick<NewsArticle, "content_km" | "content_en">,
+  article: Pick<NewsArticle, "content_kh" | "content_en">,
   isKhmer: boolean,
 ) {
   return isKhmer
-    ? article.content_km?.trim() || article.content_en?.trim() || ""
-    : article.content_en?.trim() || article.content_km?.trim() || "";
+    ? article.content_kh?.trim() || article.content_en?.trim() || ""
+    : article.content_en?.trim() || article.content_kh?.trim() || "";
 }
 
 function getCategoryLabel(category: string | null, isKhmer: boolean) {
@@ -102,16 +102,16 @@ function getCategoryLabel(category: string | null, isKhmer: boolean) {
     return isKhmer ? "ព័ត៌មាន" : "News";
   }
 
-  const labels: Record<string, { en: string; km: string }> = {
-    activities: { en: "Activities", km: "សកម្មភាព" },
-    announcement: { en: "Announcement", km: "សេចក្តីជូនដំណឹង" },
-    meeting: { en: "Meeting", km: "កិច្ចប្រជុំ" },
+  const labels: Record<string, { en: string; kh: string }> = {
+    activities: { en: "Activities", kh: "សកម្មភាព" },
+    announcement: { en: "Announcement", kh: "សេចក្តីជូនដំណឹង" },
+    meeting: { en: "Meeting", kh: "កិច្ចប្រជុំ" },
   };
 
   const normalized = category.toLowerCase();
 
   if (labels[normalized]) {
-    return isKhmer ? labels[normalized].km : labels[normalized].en;
+    return isKhmer ? labels[normalized].kh : labels[normalized].en;
   }
 
   return category;
@@ -121,7 +121,7 @@ export default function NewsDetail() {
   const { id } = useParams<{ id: string }>();
   const { i18n } = useTranslation();
 
-  const isKhmer = i18n.language.toLowerCase().startsWith("km");
+  const isKhmer = i18n.language.toLowerCase().startsWith("kh");
 
   const [article, setArticle] = useState<NewsArticle | null>(null);
   const [images, setImages] = useState<GalleryImage[]>([]);
@@ -154,7 +154,7 @@ export default function NewsDetail() {
       const { data: articleData, error: articleError } = await supabase
         .from("news")
         .select(
-          "id, title_km, title_en, summary_km, summary_en, content_km, content_en, image_url, category, status, published_at, created_at",
+          "id, title_kh, title_en, summary_kh, summary_en, content_kh, content_en, image_url, category, status, published_at, created_at",
         )
         .eq("id", id)
         .eq("status", "published")
@@ -216,9 +216,7 @@ export default function NewsDetail() {
                 id: `main-${currentArticle.id}`,
                 image_url: currentArticle.image_url,
                 alt_text:
-                  currentArticle.title_en ||
-                  currentArticle.title_km ||
-                  "",
+                  currentArticle.title_en || currentArticle.title_kh || "",
                 display_order: 1,
               },
             ]
@@ -240,9 +238,7 @@ export default function NewsDetail() {
           ) === index,
       );
 
-      uniqueImages.sort(
-        (a, b) => a.display_order - b.display_order,
-      );
+      uniqueImages.sort((a, b) => a.display_order - b.display_order);
 
       setImages(uniqueImages);
       setLoading(false);
@@ -263,7 +259,7 @@ export default function NewsDetail() {
       const { data, error } = await supabase
         .from("news")
         .select(
-          "id, title_km, title_en, image_url, category, published_at, created_at",
+          "id, title_kh, title_en, image_url, category, published_at, created_at",
         )
         .eq("status", "published")
         .order("published_at", {
@@ -281,9 +277,7 @@ export default function NewsDetail() {
       }
 
       setRecentNews(
-        ((data ?? []) as RecentArticle[]).filter(
-          (item) => item.id !== id,
-        ),
+        ((data ?? []) as RecentArticle[]).filter((item) => item.id !== id),
       );
     }
 
@@ -326,9 +320,7 @@ export default function NewsDetail() {
 
       await navigator.clipboard.writeText(window.location.href);
 
-      setShareMessage(
-        isKhmer ? "បានចម្លងតំណរួចរាល់!" : "Article link copied!",
-      );
+      setShareMessage(isKhmer ? "បានចម្លងតំណរួចរាល់!" : "Article link copied!");
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") {
         return;
@@ -477,9 +469,7 @@ export default function NewsDetail() {
                 </a>
 
                 {shareMessage && (
-                  <span className="text-xs text-green-700">
-                    {shareMessage}
-                  </span>
+                  <span className="text-xs text-green-700">{shareMessage}</span>
                 )}
               </div>
             </header>
@@ -543,10 +533,7 @@ export default function NewsDetail() {
             {/* Academy information */}
             <section className="border-b border-slate-200 pb-7">
               <div className="flex items-start gap-3">
-                <Shield
-                  size={26}
-                  className="mt-1 shrink-0 text-blue-700"
-                />
+                <Shield size={26} className="mt-1 shrink-0 text-blue-700" />
 
                 <div>
                   <h2 className="text-lg font-bold leading-7 text-slate-900">
@@ -586,8 +573,8 @@ export default function NewsDetail() {
                 <div className="divide-y divide-slate-100">
                   {recentNews.map((item) => {
                     const recentTitle = isKhmer
-                      ? item.title_km?.trim() || item.title_en?.trim() || ""
-                      : item.title_en?.trim() || item.title_km?.trim() || "";
+                      ? item.title_kh?.trim() || item.title_en?.trim() || ""
+                      : item.title_en?.trim() || item.title_kh?.trim() || "";
 
                     return (
                       <Link
@@ -604,10 +591,7 @@ export default function NewsDetail() {
                               className="h-full w-full object-contain"
                             />
                           ) : (
-                            <ImageIcon
-                              size={23}
-                              className="text-slate-400"
-                            />
+                            <ImageIcon size={23} className="text-slate-400" />
                           )}
                         </div>
 

@@ -6,7 +6,7 @@ import { supabase } from "../../lib/supabase";
 
 interface NewsArticle {
   id: string;
-  title_km: string | null;
+  title_kh: string | null;
   title_en: string | null;
   image_url: string | null;
   published_at: string | null;
@@ -16,7 +16,7 @@ interface NewsArticle {
 export default function Hero() {
   const { i18n } = useTranslation();
 
-  const isKhmer = i18n.language.startsWith("kh");
+  const isKhmer = i18n.language.toLowerCase().startsWith("kh");
 
   const [featuredNews, setFeaturedNews] = useState<NewsArticle[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -32,7 +32,7 @@ export default function Hero() {
 
       const { data, error } = await supabase
         .from("news")
-        .select("id, title_km, title_en, image_url, published_at, created_at")
+        .select("id, title_kh, title_en, image_url, published_at, created_at")
         .eq("status", "published")
         .eq("is_pinned", true)
         .order("published_at", {
@@ -45,7 +45,7 @@ export default function Hero() {
       if (!isMounted) return;
 
       if (error) {
-        console.error("Failed to load featured news:", error);
+        console.error("Failed to load featured news:", error.message);
         setFeaturedNews([]);
       } else {
         setFeaturedNews(data ?? []);
@@ -85,10 +85,10 @@ export default function Hero() {
 
   function getTitle(article: NewsArticle) {
     if (isKhmer) {
-      return article.title_km?.trim() || article.title_en?.trim() || "ព័ត៌មាន";
+      return article.title_kh?.trim() || article.title_en?.trim() || "ព័ត៌មាន";
     }
 
-    return article.title_en?.trim() || article.title_km?.trim() || "News";
+    return article.title_en?.trim() || article.title_kh?.trim() || "News";
   }
 
   function formatDate(article: NewsArticle) {
@@ -96,7 +96,7 @@ export default function Hero() {
 
     if (!date) return "";
 
-    return new Intl.DateTimeFormat(isKhmer ? "km-KH" : "en-GB", {
+    return new Intl.DateTimeFormat(isKhmer ? "kh-KH" : "en-GB", {
       day: "numeric",
       month: "long",
       year: "numeric",
@@ -136,24 +136,23 @@ export default function Hero() {
   return (
     <section className="bg-slate-50 py-5 sm:py-7 md:py-9">
       <div className="mx-auto max-w-7xl px-3 sm:px-5">
-        {/* Announcement Heading */}{" "}
+        {/* Announcement Heading */}
         <div className="mb-5 flex items-center gap-3">
-          {" "}
-          <div className="h-8 w-1 rounded-full bg-blue-900" />{" "}
+          <div className="h-8 w-1 rounded-full bg-blue-900" />
+
           <div>
-            {" "}
             <h2 className="text-xl font-bold text-slate-900 sm:text-2xl">
-              {" "}
-              {isKhmer ? "សេចក្តីប្រកាស" : "Announcement"}{" "}
-            </h2>{" "}
+              {isKhmer ? "សេចក្តីប្រកាស" : "Announcement"}
+            </h2>
+
             <p className="mt-1 text-xs text-slate-500 sm:text-sm">
-              {" "}
               {isKhmer
                 ? "ព័ត៌មាន និងសេចក្តីជូនដំណឹងសំខាន់ៗ"
-                : "Important news and updates from the academy"}{" "}
-            </p>{" "}
-          </div>{" "}
+                : "Important news and updates from the academy"}
+            </p>
+          </div>
         </div>
+
         {/* Featured news slider */}
         <div
           className="relative overflow-hidden rounded-xl bg-white shadow-md sm:rounded-2xl"
@@ -258,6 +257,7 @@ export default function Hero() {
             </>
           )}
         </div>
+
         {/* News preview cards */}
         {featuredNews.length > 1 && (
           <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">

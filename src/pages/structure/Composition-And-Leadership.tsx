@@ -1,5 +1,5 @@
-
 import { useEffect, useState } from "react";
+import RouteLoading from "../../components/common/RouteLoading";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
@@ -7,7 +7,6 @@ import {
   CalendarDays,
   Fingerprint,
   GraduationCap,
-  LoaderCircle,
   Mail,
   MapPin,
   Phone,
@@ -70,7 +69,7 @@ export default function CompositionAndLeadership() {
 
   return (
     <main
-      lang={isKhmer ? "km" : "en"}
+      lang={isKhmer ? "kh" : "en"}
       className={`min-h-screen bg-gray-50 text-black ${
         isKhmer ? "font-battambang" : "font-inter"
       }`}
@@ -100,9 +99,7 @@ export default function CompositionAndLeadership() {
           </p>
 
           <h1 className="text-3xl font-bold leading-tight text-black sm:text-4xl">
-            {isKhmer
-              ? "សមាសភាព និងថ្នាក់ដឹកនាំ"
-              : "Composition and Leadership"}
+            {isKhmer ? "សមាសភាព និងថ្នាក់ដឹកនាំ" : "Composition and Leadership"}
           </h1>
 
           <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-gray-600">
@@ -127,21 +124,17 @@ export default function CompositionAndLeadership() {
           {/* Leadership */}
           <article className="order-1 min-w-0">
             {/* Loading */}
-            {loadingLeaders && (
-              <div className="flex items-center justify-center gap-3 rounded-lg border border-gray-200 bg-white px-6 py-12 text-gray-600">
-                <LoaderCircle
-                  size={22}
-                  className="animate-spin"
-                  style={{ color: MAIN_COLOR }}
-                />
-
-                <span>
-                  {isKhmer
-                    ? "កំពុងផ្ទុកព័ត៌មាន..."
-                    : "Loading leadership information..."}
-                </span>
-              </div>
-            )}
+{loadingLeaders && (
+  <div className="rounded-lg border border-gray-200 bg-white">
+    <RouteLoading
+      message={
+        isKhmer
+          ? "កំពុងផ្ទុកព័ត៌មានថ្នាក់ដឹកនាំ..."
+          : "Loading leadership information..."
+      }
+    />
+  </div>
+)}
 
             {/* Error */}
             {!loadingLeaders && leaderError && (
@@ -186,28 +179,32 @@ export default function CompositionAndLeadership() {
                   >
                     <div className="grid grid-cols-1 sm:grid-cols-[180px_minmax(0,1fr)]">
                       {/* Leader photo */}
-<div className="flex min-h-[200px] items-center justify-center bg-slate-50 p-3 sm:min-h-[220px]">
-  {leader.image_url ? (
-    <img
-      src={leader.image_url}
-      alt={
-        isKhmer
-          ? leader.name_kh || leader.name_en || ""
-          : leader.name_en || leader.name_kh || ""
-      }
-      width={400}
-      height={500}
-      loading={leaders.indexOf(leader) === 0 ? "eager" : "lazy"}
-      fetchPriority={leaders.indexOf(leader) === 0 ? "high" : "auto"}
-      decoding="async"
-      className="max-h-[270px] w-full object-contain"
-    />
-  ) : (
-    <div className="flex h-32 w-32 items-center justify-center rounded-full bg-blue-100">
-      <Shield size={48} className="text-blue-700" />
-    </div>
-  )}
-</div>
+                      <div className="flex min-h-[200px] items-center justify-center bg-slate-50 p-3 sm:min-h-[220px]">
+                        {leader.image_url ? (
+                          <img
+                            src={leader.image_url}
+                            alt={
+                              isKhmer
+                                ? leader.name_kh || leader.name_en || ""
+                                : leader.name_en || leader.name_kh || ""
+                            }
+                            width={400}
+                            height={500}
+                            loading={
+                              leaders.indexOf(leader) === 0 ? "eager" : "lazy"
+                            }
+                            fetchPriority={
+                              leaders.indexOf(leader) === 0 ? "high" : "auto"
+                            }
+                            decoding="async"
+                            className="max-h-[270px] w-full object-contain"
+                          />
+                        ) : (
+                          <div className="flex h-32 w-32 items-center justify-center rounded-full bg-blue-100">
+                            <Shield size={48} className="text-blue-700" />
+                          </div>
+                        )}
+                      </div>
 
                       {/* Leader information */}
                       <div className="min-w-0 p-4 sm:p-5">
@@ -401,4 +398,3 @@ export default function CompositionAndLeadership() {
     </main>
   );
 }
-

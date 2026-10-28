@@ -1,4 +1,3 @@
-
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
@@ -19,7 +18,7 @@ import { supabase } from "../../lib/supabase";
 
 interface NewsArticle {
   id: string | number;
-  title_km: string | null;
+  title_kh: string | null;
   title_en: string | null;
   category: string | null;
   status: string;
@@ -28,7 +27,7 @@ interface NewsArticle {
   is_pinned: boolean;
 }
 
-type Language = "en" | "km";
+type Language = "en" | "kh";
 
 export default function ManageNews() {
   const [articles, setArticles] = useState<NewsArticle[]>([]);
@@ -45,8 +44,7 @@ export default function ManageNews() {
 
   const pinnedCount = articles.filter(
     (article) =>
-      article.is_pinned &&
-      article.status.toLowerCase() === "published",
+      article.is_pinned && article.status.toLowerCase() === "published",
   ).length;
 
   // Load articles from Supabase.
@@ -63,7 +61,7 @@ export default function ManageNews() {
       const { data, error: queryError } = await supabase
         .from("news")
         .select(
-          "id, title_km, title_en, category, status, published_at, created_at, is_pinned",
+          "id, title_kh, title_en, category, status, published_at, created_at, is_pinned",
         )
         .order("created_at", { ascending: false });
 
@@ -126,18 +124,14 @@ export default function ManageNews() {
 
   // Get the title in the selected language.
   function getTitle(article: NewsArticle): string {
-    if (language === "km") {
+    if (language === "kh") {
       return (
-        article.title_km?.trim() ||
-        article.title_en?.trim() ||
-        "គ្មានចំណងជើង"
+        article.title_kh?.trim() || article.title_en?.trim() || "គ្មានចំណងជើង"
       );
     }
 
     return (
-      article.title_en?.trim() ||
-      article.title_km?.trim() ||
-      "Untitled article"
+      article.title_en?.trim() || article.title_kh?.trim() || "Untitled article"
     );
   }
 
@@ -151,14 +145,11 @@ export default function ManageNews() {
       return "Not published";
     }
 
-    return new Intl.DateTimeFormat(
-      language === "km" ? "km-KH" : "en-GB",
-      {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-      },
-    ).format(parsedDate);
+    return new Intl.DateTimeFormat(language === "kh" ? "kh-KH" : "en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    }).format(parsedDate);
   }
 
   // Get available categories.
@@ -178,13 +169,13 @@ export default function ManageNews() {
 
     return articles.filter((article) => {
       const titleEn = article.title_en ?? "";
-      const titleKm = article.title_km ?? "";
+      const titlekh = article.title_kh ?? "";
       const category = article.category ?? "";
 
       const matchesSearch =
         !query ||
         titleEn.toLowerCase().includes(query) ||
-        titleKm.toLowerCase().includes(query) ||
+        titlekh.toLowerCase().includes(query) ||
         category.toLowerCase().includes(query) ||
         String(article.id).toLowerCase().includes(query);
 
@@ -261,16 +252,12 @@ export default function ManageNews() {
 
       if (deleteError) throw deleteError;
 
-      setArticles((current) =>
-        current.filter((article) => article.id !== id),
-      );
+      setArticles((current) => current.filter((article) => article.id !== id));
     } catch (err) {
       console.error("Failed to delete article:", err);
 
       setError(
-        err instanceof Error
-          ? err.message
-          : "Unable to delete the article.",
+        err instanceof Error ? err.message : "Unable to delete the article.",
       );
     } finally {
       setDeletingId(null);
@@ -282,9 +269,7 @@ export default function ManageNews() {
       {/* Page heading */}
       <div className="flex flex-col justify-between gap-4 border-b border-slate-200 pb-5 sm:flex-row sm:items-center">
         <div>
-          <p className="text-sm font-medium text-blue-600">
-            WEBSITE CONTENT
-          </p>
+          <p className="text-sm font-medium text-blue-600">WEBSITE CONTENT</p>
 
           <h1 className="mt-1 text-2xl font-bold text-slate-900">
             Articles &amp; News
@@ -302,10 +287,7 @@ export default function ManageNews() {
             disabled={refreshing || loading}
             className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            <RefreshCw
-              size={17}
-              className={refreshing ? "animate-spin" : ""}
-            />
+            <RefreshCw size={17} className={refreshing ? "animate-spin" : ""} />
             Refresh
           </button>
 
@@ -379,9 +361,9 @@ export default function ManageNews() {
         <div className="inline-flex rounded-lg border border-slate-200 bg-white p-1">
           <button
             type="button"
-            onClick={() => setLanguage("km")}
+            onClick={() => setLanguage("kh")}
             className={`rounded-md px-3 py-1.5 text-sm font-medium ${
-              language === "km"
+              language === "kh"
                 ? "bg-blue-600 text-white"
                 : "text-slate-600 hover:bg-slate-100"
             }`}
@@ -511,8 +493,7 @@ export default function ManageNews() {
                     const isPublished =
                       article.status.toLowerCase() === "published";
 
-                    const isDraft =
-                      article.status.toLowerCase() === "draft";
+                    const isDraft = article.status.toLowerCase() === "draft";
 
                     return (
                       <tr
@@ -531,7 +512,7 @@ export default function ManageNews() {
                               </p>
 
                               <p className="mt-1 break-all text-xs text-slate-400">
-                                {language === "km" ? "Khmer" : "English"} · ID{" "}
+                                {language === "kh" ? "Khmer" : "English"} · ID{" "}
                                 {article.id}
                               </p>
                             </div>
@@ -590,8 +571,7 @@ export default function ManageNews() {
                               onClick={() => void togglePin(article)}
                               disabled={
                                 pinningId !== null ||
-                                (!article.is_pinned &&
-                                  pinnedCount >= 3) ||
+                                (!article.is_pinned && pinnedCount >= 3) ||
                                 !isPublished
                               }
                               title={
@@ -691,4 +671,3 @@ export default function ManageNews() {
     </div>
   );
 }
-

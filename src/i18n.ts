@@ -4,7 +4,7 @@ import { initReactI18next } from "react-i18next";
 import en from "./locales/en.json";
 import kh from "./locales/kh.json";
 i18n.on("languageChanged", (language) => {
-  document.documentElement.lang = language === "kh" ? "km" : "en";
+  document.documentElement.lang = language === "kh" ? "kh" : "en";
 });
 i18n.use(initReactI18next).init({
   resources: {

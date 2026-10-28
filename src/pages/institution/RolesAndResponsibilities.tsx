@@ -1,4 +1,3 @@
-
 import { Link } from "react-router-dom";
 import { CalendarDays, Eye, ArrowRight } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -14,8 +13,7 @@ export default function RolesAndResponsibilities() {
     "en"
   ).toLowerCase();
 
-  const isKhmer =
-    language.startsWith("kh") || language.startsWith("km");
+  const isKhmer = language.startsWith("kh") || language.startsWith("kh");
 
   const latestNews = [
     {
@@ -64,7 +62,7 @@ export default function RolesAndResponsibilities() {
 
   return (
     <main
-      lang={isKhmer ? "km" : "en"}
+      lang={isKhmer ? "kh" : "en"}
       className={`min-h-screen bg-gray-50 text-black ${
         isKhmer ? "font-battambang" : "font-inter"
       }`}
@@ -97,13 +95,8 @@ export default function RolesAndResponsibilities() {
 
           <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-gray-600">
             <span className="inline-flex items-center gap-2">
-              <CalendarDays
-                size={16}
-                style={{ color: MAIN_COLOR }}
-              />
-              <time dateTime="2019-09-18">
-                {t("roles.date")}
-              </time>
+              <CalendarDays size={16} style={{ color: MAIN_COLOR }} />
+              <time dateTime="2019-09-18">{t("roles.date")}</time>
             </span>
 
             <span className="inline-flex items-center gap-2">
@@ -146,10 +139,7 @@ export default function RolesAndResponsibilities() {
                     className="border-b border-gray-200 pb-5 last:border-b-0"
                   >
                     <h4 className="mb-2 font-bold leading-7 text-black">
-                      <span
-                        className="mr-2"
-                        style={{ color: MAIN_COLOR }}
-                      >
+                      <span className="mr-2" style={{ color: MAIN_COLOR }}>
                         {index + 1}.
                       </span>
                       {item.title}
@@ -289,4 +279,3 @@ export default function RolesAndResponsibilities() {
     </main>
   );
 }
-

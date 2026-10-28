@@ -12,10 +12,10 @@ export default function Hero() {
     "en"
   ).toLowerCase();
 
-  const isKhmer = language.startsWith("kh") || language.startsWith("km");
+  const isKhmer = language.startsWith("kh") || language.startsWith("kh");
 
   useEffect(() => {
-    document.documentElement.lang = isKhmer ? "km" : "en";
+    document.documentElement.lang = isKhmer ? "kh" : "en";
   }, [isKhmer]);
 
   return (
@@ -131,7 +131,6 @@ export default function Hero() {
                   index !== 0 ? "border-l border-white/20 pl-3" : ""
                 } ${isKhmer ? "font-khmer" : "font-english"}`}
               >
-
                 <span className="break-words text-[9px] font-semibold sm:text-sm">
                   {isKhmer ? value.kh : value.en}
                 </span>

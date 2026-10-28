@@ -1,4 +1,3 @@
-
 import { Link } from "react-router-dom";
 import { CalendarDays, Eye, ArrowRight } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -57,7 +56,7 @@ export default function Background() {
 
   return (
     <main
-      lang={isKhmer ? "km" : "en"}
+      lang={isKhmer ? "kh" : "en"}
       className={`min-h-screen bg-gray-50 text-black ${
         isKhmer ? "font-battambang" : "font-inter"
       }`}

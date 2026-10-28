@@ -13,7 +13,7 @@ export default function Strategic() {
     "en"
   ).toLowerCase();
 
-  const isKhmer = language.startsWith("kh") || language.startsWith("km");
+  const isKhmer = language.startsWith("kh") || language.startsWith("kh");
 
   const strategyCount = isKhmer ? 5 : 11;
   const strategies = Array.from({ length: strategyCount }, (_, index) =>

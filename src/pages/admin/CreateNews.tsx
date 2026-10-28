@@ -15,14 +15,14 @@ import {
 type Category = {
   id: string;
   name_en: string;
-  name_km: string;
+  name_kh: string;
   slug: string;
 };
 
 type ArticleForm = {
-  titleKm: string;
-  summaryKm: string;
-  contentKm: string;
+  titlekh: string;
+  summarykh: string;
+  contentkh: string;
   titleEn: string;
   summaryEn: string;
   contentEn: string;
@@ -38,9 +38,9 @@ const MAX_IMAGES = 20;
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
 
 const initialForm: ArticleForm = {
-  titleKm: "",
-  summaryKm: "",
-  contentKm: "",
+  titlekh: "",
+  summarykh: "",
+  contentkh: "",
   titleEn: "",
   summaryEn: "",
   contentEn: "",
@@ -51,7 +51,7 @@ export default function CreateNews() {
   const navigate = useNavigate();
   const { i18n } = useTranslation();
 
-  const isKhmer = i18n.language.startsWith("km");
+  const isKhmer = i18n.language.startsWith("kh");
 
   const [form, setForm] = useState<ArticleForm>(initialForm);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -70,7 +70,7 @@ export default function CreateNews() {
 
       const { data, error } = await supabase
         .from("categories")
-        .select("id, name_en, name_km, slug")
+        .select("id, name_en, name_kh, slug")
         .order("name_en", { ascending: true });
 
       if (!active) return;
@@ -192,7 +192,7 @@ export default function CreateNews() {
     setSuccess("");
 
     // Require a title in at least one language.
-    if (!form.titleKm.trim() && !form.titleEn.trim()) {
+    if (!form.titlekh.trim() && !form.titleEn.trim()) {
       showError(
         isKhmer
           ? "សូមបញ្ចូលចំណងជើងជាភាសាខ្មែរ ឬភាសាអង់គ្លេស។"
@@ -221,7 +221,7 @@ export default function CreateNews() {
     }
 
     // Article content is optional.
-    // Do not require contentKm or contentEn to publish.
+    // Do not require contentkh or contentEn to publish.
 
     setSaving(true);
     setStatus(nextStatus);
@@ -237,9 +237,7 @@ export default function CreateNews() {
         const file = images[index].file;
         const extension = file.name.split(".").pop()?.toLowerCase() || "jpg";
 
-        const safeExtension = /^[a-z0-9]+$/.test(extension)
-          ? extension
-          : "jpg";
+        const safeExtension = /^[a-z0-9]+$/.test(extension) ? extension : "jpg";
 
         const filePath = `news/${crypto.randomUUID()}-${index}.${safeExtension}`;
 
@@ -272,11 +270,11 @@ export default function CreateNews() {
       const { data: newsData, error: newsError } = await supabase
         .from("news")
         .insert({
-          title_km: form.titleKm.trim() || null,
-          summary_km: form.summaryKm.trim() || null,
+          title_kh: form.titlekh.trim() || null,
+          summary_kh: form.summarykh.trim() || null,
 
           // Empty article content is saved as null.
-          content_km: form.contentKm.trim() || null,
+          content_kh: form.contentkh.trim() || null,
 
           title_en: form.titleEn.trim() || null,
           summary_en: form.summaryEn.trim() || null,
@@ -441,18 +439,18 @@ export default function CreateNews() {
             <div className="space-y-5">
               <div>
                 <label
-                  htmlFor="title-km"
+                  htmlFor="title-kh"
                   className="mb-2 block text-sm font-semibold text-slate-700"
                 >
                   ចំណងជើង
                 </label>
 
                 <input
-                  id="title-km"
+                  id="title-kh"
                   type="text"
-                  value={form.titleKm}
+                  value={form.titlekh}
                   onChange={(event) =>
-                    updateField("titleKm", event.target.value)
+                    updateField("titlekh", event.target.value)
                   }
                   placeholder="បញ្ចូលចំណងជើងជាភាសាខ្មែរ..."
                   className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
@@ -461,7 +459,7 @@ export default function CreateNews() {
 
               <div>
                 <label
-                  htmlFor="summary-km"
+                  htmlFor="summary-kh"
                   className="mb-2 block text-sm font-semibold text-slate-700"
                 >
                   សេចក្តីសង្ខេប
@@ -471,11 +469,11 @@ export default function CreateNews() {
                 </label>
 
                 <textarea
-                  id="summary-km"
+                  id="summary-kh"
                   rows={3}
-                  value={form.summaryKm}
+                  value={form.summarykh}
                   onChange={(event) =>
-                    updateField("summaryKm", event.target.value)
+                    updateField("summarykh", event.target.value)
                   }
                   placeholder="បញ្ចូលសេចក្តីសង្ខេប..."
                   className="w-full resize-y rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
@@ -484,7 +482,7 @@ export default function CreateNews() {
 
               <div>
                 <label
-                  htmlFor="content-km"
+                  htmlFor="content-kh"
                   className="mb-2 block text-sm font-semibold text-slate-700"
                 >
                   ខ្លឹមសារព័ត៌មាន
@@ -494,11 +492,11 @@ export default function CreateNews() {
                 </label>
 
                 <textarea
-                  id="content-km"
+                  id="content-kh"
                   rows={8}
-                  value={form.contentKm}
+                  value={form.contentkh}
                   onChange={(event) =>
-                    updateField("contentKm", event.target.value)
+                    updateField("contentkh", event.target.value)
                   }
                   placeholder="សរសេរខ្លឹមសារព័ត៌មាន ប្រសិនបើមាន..."
                   className="w-full resize-y rounded-xl border border-slate-300 px-4 py-3 text-sm leading-7 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
@@ -606,9 +604,7 @@ export default function CreateNews() {
             <select
               id="category"
               value={form.category}
-              onChange={(event) =>
-                updateField("category", event.target.value)
-              }
+              onChange={(event) => updateField("category", event.target.value)}
               disabled={loadingCategories}
               className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-100"
             >
@@ -624,7 +620,7 @@ export default function CreateNews() {
 
               {categories.map((category) => (
                 <option key={category.id} value={category.slug}>
-                  {isKhmer ? category.name_km : category.name_en}
+                  {isKhmer ? category.name_kh : category.name_en}
                 </option>
               ))}
             </select>

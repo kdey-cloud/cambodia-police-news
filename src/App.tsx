@@ -1,4 +1,8 @@
+
+import { useEffect, useState } from "react";
 import { Routes, Route } from "react-router-dom";
+
+import LoadingScreen from "./components/common/LoadingScreen";
 
 import Navbar from "./components/common/Navbar";
 import Footer from "./components/common/Footer";
@@ -16,11 +20,12 @@ import RolesAndResponsibilities from "./pages/institution/RolesAndResponsibiliti
 import Strategic from "./pages/institution/Strategic";
 import CompositionAndLeadership from "./pages/structure/Composition-And-Leadership";
 
-// Admin pages
 import AdminLayout from "./layouts/AdminLayout";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import ManageNews from "./pages/admin/ManageNews";
 import CreateNews from "./pages/admin/CreateNews";
+import Categories from "./pages/admin/Categories";
+import MediaLibrary from "./pages/admin/MediaLibrary";
 
 function PublicLayout() {
   return (
@@ -35,10 +40,26 @@ function PublicLayout() {
           <Route path="/news" element={<News />} />
           <Route path="/news/:id" element={<NewsDetail />} />
           <Route path="/search" element={<Search />} />
-          <Route path="/institution/background" element={<Background />} />
-          <Route path="/institution/roles-and-responsibilities" element={<RolesAndResponsibilities />} />
-          <Route path="/institution/strategy" element={<Strategic />} />
-          <Route path="/pac-leadership" element={<CompositionAndLeadership />} />
+
+          <Route
+            path="/institution/background"
+            element={<Background />}
+          />
+
+          <Route
+            path="/institution/roles-and-responsibilities"
+            element={<RolesAndResponsibilities />}
+          />
+
+          <Route
+            path="/institution/strategy"
+            element={<Strategic />}
+          />
+
+          <Route
+            path="/pac-leadership"
+            element={<CompositionAndLeadership />}
+          />
         </Routes>
       </main>
 
@@ -47,7 +68,21 @@ function PublicLayout() {
   );
 }
 
-export default function App() {
+function AppContent() {
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setIsLoading(false);
+    }, 1200);
+
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  if (isLoading) {
+    return <LoadingScreen />;
+  }
+
   return (
     <Routes>
       {/* Admin login */}
@@ -66,6 +101,8 @@ export default function App() {
         <Route path="dashboard" element={<AdminDashboard />} />
         <Route path="news" element={<ManageNews />} />
         <Route path="news/new" element={<CreateNews />} />
+        <Route path="categories" element={<Categories />} />
+        <Route path="media" element={<MediaLibrary />} />
       </Route>
 
       {/* Public website */}
@@ -73,3 +110,8 @@ export default function App() {
     </Routes>
   );
 }
+
+export default function App() {
+  return <AppContent />;
+}
+

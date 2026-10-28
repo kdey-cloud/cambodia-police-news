@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -12,7 +11,7 @@ import { supabase } from "../../lib/supabase";
 
 type RecentArticle = {
   id: string;
-  title_km: string | null;
+  title_kh: string | null;
   title_en: string | null;
   image_url: string | null;
   category: string | null;
@@ -33,7 +32,7 @@ function formatDate(dateString: string | null, language: string) {
   if (Number.isNaN(date.getTime())) return "";
 
   return new Intl.DateTimeFormat(
-    language.toLowerCase().startsWith("kh") ? "km-KH" : "en-GB",
+    language.toLowerCase().startsWith("kh") ? "kh-KH" : "en-GB",
     {
       year: "numeric",
       month: "long",
@@ -47,16 +46,16 @@ function getCategoryLabel(category: string | null, isKhmer: boolean) {
     return isKhmer ? "ព័ត៌មាន" : "News";
   }
 
-  const labels: Record<string, { en: string; km: string }> = {
-    activities: { en: "Activities", km: "សកម្មភាព" },
-    announcement: { en: "Announcement", km: "សេចក្តីជូនដំណឹង" },
-    meeting: { en: "Meeting", km: "កិច្ចប្រជុំ" },
+  const labels: Record<string, { en: string; kh: string }> = {
+    activities: { en: "Activities", kh: "សកម្មភាព" },
+    announcement: { en: "Announcement", kh: "សេចក្តីជូនដំណឹង" },
+    meeting: { en: "Meeting", kh: "កិច្ចប្រជុំ" },
   };
 
   const label = labels[category.toLowerCase()];
 
   if (label) {
-    return isKhmer ? label.km : label.en;
+    return isKhmer ? label.kh : label.en;
   }
 
   return category;
@@ -80,7 +79,7 @@ export default function RecentNews({
       const { data, error } = await supabase
         .from("news")
         .select(
-          "id, title_km, title_en, image_url, category, published_at, created_at",
+          "id, title_kh, title_en, image_url, category, published_at, created_at",
         )
         .eq("status", "published")
         .order("published_at", {
@@ -99,9 +98,7 @@ export default function RecentNews({
 
       const articles = (data ?? []) as RecentArticle[];
 
-      setRecentNews(
-        articles.filter((item) => item.id !== currentArticleId),
-      );
+      setRecentNews(articles.filter((item) => item.id !== currentArticleId));
     }
 
     void loadRecentNews();
@@ -116,10 +113,7 @@ export default function RecentNews({
       {/* Academy Information */}
       <section className="border-b border-slate-200 pb-7">
         <div className="flex items-start gap-3">
-          <Shield
-            size={26}
-            className="mt-1 shrink-0 text-blue-700"
-          />
+          <Shield size={26} className="mt-1 shrink-0 text-blue-700" />
 
           <div>
             <h2 className="text-lg font-bold leading-7 text-slate-900">
@@ -159,8 +153,8 @@ export default function RecentNews({
           <div className="divide-y divide-slate-100">
             {recentNews.map((item) => {
               const recentTitle = isKhmer
-                ? item.title_km?.trim() || item.title_en?.trim() || ""
-                : item.title_en?.trim() || item.title_km?.trim() || "";
+                ? item.title_kh?.trim() || item.title_en?.trim() || ""
+                : item.title_en?.trim() || item.title_kh?.trim() || "";
 
               return (
                 <Link
@@ -177,10 +171,7 @@ export default function RecentNews({
                         className="h-full w-full object-contain"
                       />
                     ) : (
-                      <ImageIcon
-                        size={23}
-                        className="text-slate-400"
-                      />
+                      <ImageIcon size={23} className="text-slate-400" />
                     )}
                   </div>
 
@@ -190,8 +181,7 @@ export default function RecentNews({
                     </span>
 
                     <h3 className="mt-1 line-clamp-2 text-sm font-semibold leading-6 text-slate-800 transition group-hover:text-blue-700">
-                      {recentTitle ||
-                        (isKhmer ? "គ្មានចំណងជើង" : "Untitled")}
+                      {recentTitle || (isKhmer ? "គ្មានចំណងជើង" : "Untitled")}
                     </h3>
 
                     <p className="mt-2 flex items-center gap-1 text-xs text-slate-400">
@@ -226,4 +216,3 @@ export default function RecentNews({
     </div>
   );
 }
-
