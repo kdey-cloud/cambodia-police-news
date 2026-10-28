@@ -9,8 +9,8 @@ export default function Home() {
     <>
       <main>
         <Hero />
-        <LatestNewsSection />
         <AnnouncementsSection />
+        <LatestNewsSection />
         <MeetingSection />
         {/* <PublicInformation /> */}
       </main>

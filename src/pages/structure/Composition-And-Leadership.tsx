@@ -186,24 +186,28 @@ export default function CompositionAndLeadership() {
                   >
                     <div className="grid grid-cols-1 sm:grid-cols-[180px_minmax(0,1fr)]">
                       {/* Leader photo */}
-                      <div className="flex min-h-[200px] items-center justify-center bg-slate-50 p-3 sm:min-h-[220px]">
-                        {leader.image_url ? (
-                          <img
-                            src={leader.image_url}
-                            alt={
-                              isKhmer
-                                ? leader.name_kh || leader.name_en || ""
-                                : leader.name_en || leader.name_kh || ""
-                            }
-                            loading="lazy"
-                            className="max-h-[240px] w-full object-contain"
-                          />
-                        ) : (
-                          <div className="flex h-32 w-32 items-center justify-center rounded-full bg-blue-100">
-                            <Shield size={48} className="text-blue-700" />
-                          </div>
-                        )}
-                      </div>
+<div className="flex min-h-[200px] items-center justify-center bg-slate-50 p-3 sm:min-h-[220px]">
+  {leader.image_url ? (
+    <img
+      src={leader.image_url}
+      alt={
+        isKhmer
+          ? leader.name_kh || leader.name_en || ""
+          : leader.name_en || leader.name_kh || ""
+      }
+      width={400}
+      height={500}
+      loading={leaders.indexOf(leader) === 0 ? "eager" : "lazy"}
+      fetchPriority={leaders.indexOf(leader) === 0 ? "high" : "auto"}
+      decoding="async"
+      className="max-h-[270px] w-full object-contain"
+    />
+  ) : (
+    <div className="flex h-32 w-32 items-center justify-center rounded-full bg-blue-100">
+      <Shield size={48} className="text-blue-700" />
+    </div>
+  )}
+</div>
 
                       {/* Leader information */}
                       <div className="min-w-0 p-4 sm:p-5">
