@@ -734,7 +734,7 @@ export default function NewsDetail() {
             {galleryImages.length > 0 && (
               <section className="mt-8">
                 <h2 className="mb-4 text-xl font-bold text-slate-900">
-                  {isKhmer ? "វិចិត្រសាលរូបភាព" : "Photo Gallery"}
+                  {isKhmer ? "រូបភាពបន្ថែម" : "Photo Gallery"}
                 </h2>
 
                 <div className="grid grid-cols-12 gap-2 sm:gap-4">
