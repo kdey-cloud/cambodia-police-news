@@ -1,3 +1,4 @@
+
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ChangeEvent, FormEvent, KeyboardEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
@@ -9,7 +10,6 @@ import {
   Save,
   Send,
   Trash2,
-  Upload,
   X,
 } from "lucide-react";
 
@@ -22,6 +22,8 @@ interface Category {
   slug: string;
 }
 
+type DisplaySize = "large" | "medium" | "small";
+
 interface NewsForm {
   title_kh: string;
   title_en: string;
@@ -31,6 +33,7 @@ interface NewsForm {
   content_en: string;
   category: string;
   image_url: string | null;
+  image_display_size: DisplaySize;
   status: "draft" | "published";
   published_at: string | null;
 }
@@ -41,6 +44,8 @@ interface NewsImage {
   image_url: string;
   alt_text: string | null;
   display_order: number;
+  display_size: DisplaySize;
+  is_featured: boolean;
 }
 
 interface NewImage {
@@ -48,6 +53,7 @@ interface NewImage {
   file: File;
   preview: string;
   alt_text: string;
+  display_size: DisplaySize;
 }
 
 type TextareaField =
@@ -69,6 +75,7 @@ const initialForm: NewsForm = {
   content_en: "",
   category: "",
   image_url: null,
+  image_display_size: "large",
   status: "draft",
   published_at: null,
 };
@@ -79,21 +86,25 @@ export default function EditNews() {
 
   const featuredInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
-
-  // Track temporary image previews
   const objectUrlsRef = useRef<Set<string>>(new Set());
 
   const [form, setForm] = useState<NewsForm>(initialForm);
   const [categories, setCategories] = useState<Category[]>([]);
 
+  // Existing images from news_images
   const [existingImages, setExistingImages] = useState<NewsImage[]>([]);
-  const [newImages, setNewImages] = useState<NewImage[]>([]);
 
-  const [featuredFile, setFeaturedFile] = useState<File | null>(null);
-  const [featuredPreview, setFeaturedPreview] = useState<string | null>(null);
+  // Newly uploaded featured images
+  const [newFeaturedImages, setNewFeaturedImages] = useState<NewImage[]>([]);
 
-  // ID of a newly selected gallery image to use as the main image
-  const [mainNewImageId, setMainNewImageId] = useState<string | null>(null);
+  // Newly uploaded gallery images
+  const [newGalleryImages, setNewGalleryImages] = useState<NewImage[]>([]);
+
+  // Selected primary image
+  // "current" = current news.image_url
+  // "existing-ID" = existing featured image
+  // "new-ID" = newly uploaded featured image
+  const [primaryImageId, setPrimaryImageId] = useState("current");
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -101,22 +112,20 @@ export default function EditNews() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  // Create a temporary image preview
+  // Create preview URL
   const createPreview = (file: File) => {
     const preview = URL.createObjectURL(file);
-
     objectUrlsRef.current.add(preview);
-
     return preview;
   };
 
-  // Remove a temporary image preview
+  // Remove preview URL
   const revokePreview = (preview: string) => {
     URL.revokeObjectURL(preview);
     objectUrlsRef.current.delete(preview);
   };
 
-  // Clean up previews when component unmounts
+  // Clean up previews
   useEffect(() => {
     return () => {
       objectUrlsRef.current.forEach((url) => {
@@ -126,36 +135,6 @@ export default function EditNews() {
       objectUrlsRef.current.clear();
     };
   }, []);
-
-  // Get the newly selected main gallery image
-  const selectedNewMainImage = newImages.find(
-    (image) => image.id === mainNewImageId,
-  );
-
-  // Check whether current main image is an existing gallery image
-
-
-  // Main image preview priority:
-  // 1. Newly uploaded featured image
-  // 2. Newly selected main gallery image
-  // 3. Existing main image
-  // 4. First existing additional image
-  // 5. First newly selected additional image
-  const featuredDisplayImage =
-    featuredPreview ||
-    selectedNewMainImage?.preview ||
-    form.image_url ||
-    existingImages[0]?.image_url ||
-    newImages[0]?.preview ||
-    null;
-
-  const hasSelectedMainImage = Boolean(
-    featuredPreview ||
-      selectedNewMainImage ||
-      form.image_url ||
-      existingImages.length > 0 ||
-      newImages.length > 0,
-  );
 
   // Update form fields
   const updateField = <K extends keyof NewsForm>(
@@ -168,7 +147,7 @@ export default function EditNews() {
     }));
   };
 
-  // Tab inserts four spaces in textareas
+  // Tab inserts four spaces
   const handleTextareaTab = (
     event: KeyboardEvent<HTMLTextAreaElement>,
     field: TextareaField,
@@ -178,7 +157,6 @@ export default function EditNews() {
     event.preventDefault();
 
     const textarea = event.currentTarget;
-
     const start = textarea.selectionStart;
     const end = textarea.selectionEnd;
 
@@ -194,7 +172,6 @@ export default function EditNews() {
 
     requestAnimationFrame(() => {
       textarea.focus();
-
       textarea.setSelectionRange(
         start + spaces.length,
         start + spaces.length,
@@ -202,7 +179,7 @@ export default function EditNews() {
     });
   };
 
-  // Load news and related data
+  // Load news
   const loadNews = useCallback(async () => {
     if (!id) {
       setError("News ID was not found.");
@@ -246,12 +223,22 @@ export default function EditNews() {
         content_en: newsData.content_en ?? "",
         category: newsData.category ?? "",
         image_url: newsData.image_url ?? null,
+        image_display_size: newsData.image_display_size ?? "large",
         status: newsData.status === "published" ? "published" : "draft",
         published_at: newsData.published_at ?? null,
       });
 
       setCategories(categoryData ?? []);
-      setExistingImages(imageData ?? []);
+
+      setExistingImages(
+        (imageData ?? []).map((image) => ({
+          ...image,
+          display_size: image.display_size ?? "large",
+          is_featured: Boolean(image.is_featured),
+        })),
+      );
+
+      setPrimaryImageId("current");
     } catch (err) {
       console.error("Error loading news:", err);
 
@@ -267,60 +254,25 @@ export default function EditNews() {
     void loadNews();
   }, [loadNews]);
 
-  // Select a separate featured image
-  const handleFeaturedImage = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
+  // Existing featured images
+  const existingFeaturedImages = existingImages.filter(
+    (image) => image.is_featured,
+  );
 
-    if (!file) return;
+  // Existing gallery images
+  const existingGalleryImages = existingImages.filter(
+    (image) => !image.is_featured,
+  );
 
-    if (!file.type.startsWith("image/")) {
-      setError("Please select a valid image.");
-      event.target.value = "";
-      return;
-    }
-
-    if (file.size > MAX_IMAGE_SIZE) {
-      setError("Featured image must be smaller than 5MB.");
-      event.target.value = "";
-      return;
-    }
-
-    if (featuredPreview) {
-      revokePreview(featuredPreview);
-    }
-
-    setFeaturedFile(file);
-    setFeaturedPreview(createPreview(file));
-
-    // A separately uploaded featured image takes priority
-    setMainNewImageId(null);
-
-    setError("");
-    setSuccess("");
-
-    event.target.value = "";
-  };
-
-  // Select additional gallery images
-  const handleGalleryImages = (event: ChangeEvent<HTMLInputElement>) => {
+  // Upload new featured images
+  const handleFeaturedImages = (event: ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files ?? []);
 
     if (files.length === 0) return;
 
-    const availableSlots =
-      MAX_IMAGES - existingImages.length - newImages.length;
-
-    if (availableSlots <= 0) {
-      setError(`You can upload a maximum of ${MAX_IMAGES} gallery images.`);
-      event.target.value = "";
-      return;
-    }
-
-    const selectedFiles = files.slice(0, availableSlots);
-
     const validImages: NewImage[] = [];
 
-    for (const file of selectedFiles) {
+    for (const file of files) {
       if (!file.type.startsWith("image/")) {
         setError(`${file.name} is not a valid image.`);
         continue;
@@ -336,111 +288,98 @@ export default function EditNews() {
         file,
         preview: createPreview(file),
         alt_text: "",
+        display_size: "large",
       });
     }
 
-    setNewImages((previous) => [...previous, ...validImages]);
+    setNewFeaturedImages((previous) => [...previous, ...validImages]);
 
-    setError("");
+    if (validImages.length > 0) {
+      setError("");
+      setSuccess("");
+    }
+
     event.target.value = "";
   };
 
-  // Remove newly selected gallery image
-  const removeNewImage = (imageId: string) => {
-    const image = newImages.find((item) => item.id === imageId);
+  // Upload new gallery images
+  const handleGalleryImages = (event: ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files ?? []);
+
+    if (files.length === 0) return;
+
+    const availableSlots =
+      MAX_IMAGES - existingGalleryImages.length - newGalleryImages.length;
+
+    if (availableSlots <= 0) {
+      setError(`You can upload a maximum of ${MAX_IMAGES} gallery images.`);
+      event.target.value = "";
+      return;
+    }
+
+    const validImages: NewImage[] = [];
+
+    for (const file of files.slice(0, availableSlots)) {
+      if (!file.type.startsWith("image/")) {
+        setError(`${file.name} is not a valid image.`);
+        continue;
+      }
+
+      if (file.size > MAX_IMAGE_SIZE) {
+        setError(`${file.name} is larger than 5MB.`);
+        continue;
+      }
+
+      validImages.push({
+        id: crypto.randomUUID(),
+        file,
+        preview: createPreview(file),
+        alt_text: "",
+        display_size: "large",
+      });
+    }
+
+    setNewGalleryImages((previous) => [...previous, ...validImages]);
+
+    if (validImages.length > 0) {
+      setError("");
+      setSuccess("");
+    }
+
+    event.target.value = "";
+  };
+
+  // Remove new featured image
+  const removeNewFeaturedImage = (imageId: string) => {
+    const image = newFeaturedImages.find((item) => item.id === imageId);
 
     if (!image) return;
 
     revokePreview(image.preview);
 
-    setNewImages((previous) =>
+    setNewFeaturedImages((previous) =>
       previous.filter((item) => item.id !== imageId),
     );
 
-    // If selected main image is removed, clear its selection
-    if (mainNewImageId === imageId) {
-      setMainNewImageId(null);
+    if (primaryImageId === `new-${imageId}`) {
+      setPrimaryImageId("current");
     }
   };
 
-  // Select an existing additional image as the main image
-  const setAsMainImage = (image: NewsImage) => {
-    // Clear a separately uploaded featured image
-    if (featuredPreview) {
-      revokePreview(featuredPreview);
-    }
+  // Remove new gallery image
+  const removeNewGalleryImage = (imageId: string) => {
+    const image = newGalleryImages.find((item) => item.id === imageId);
 
-    setFeaturedFile(null);
-    setFeaturedPreview(null);
+    if (!image) return;
 
-    // Clear new gallery image selection
-    setMainNewImageId(null);
+    revokePreview(image.preview);
 
-    // Save selected existing image URL in form state
-    updateField("image_url", image.image_url);
-
-    if (featuredInputRef.current) {
-      featuredInputRef.current.value = "";
-    }
-
-    setError("");
-    setSuccess("Main image selected. Save changes to confirm.");
-  };
-
-  // Select a newly added gallery image as the main image
-  const setNewImageAsMain = (image: NewImage) => {
-    // Clear a separately uploaded featured image
-    if (featuredPreview) {
-      revokePreview(featuredPreview);
-    }
-
-    setFeaturedFile(null);
-    setFeaturedPreview(null);
-
-    // Remember which new image should become the main image
-    setMainNewImageId(image.id);
-
-    // Do not save the temporary blob URL to the database
-    updateField("image_url", null);
-
-    if (featuredInputRef.current) {
-      featuredInputRef.current.value = "";
-    }
-
-    setError("");
-    setSuccess("Main image selected. Save changes to confirm.");
-  };
-
-  // Remove featured/main image selection
-  const removeFeaturedImage = () => {
-    if (featuredPreview) {
-      revokePreview(featuredPreview);
-    }
-
-    setFeaturedFile(null);
-    setFeaturedPreview(null);
-    setMainNewImageId(null);
-
-    updateField("image_url", null);
-
-    if (featuredInputRef.current) {
-      featuredInputRef.current.value = "";
-    }
-
-    setError("");
-    setSuccess("Main image removed. Save changes to confirm.");
-  };
-
-  // Update new image alt text
-  const updateNewImageAlt = (imageId: string, value: string) => {
-    setNewImages((previous) =>
-      previous.map((image) =>
-        image.id === imageId ? { ...image, alt_text: value } : image,
-      ),
+    setNewGalleryImages((previous) =>
+      previous.filter((item) => item.id !== imageId),
     );
   };
 
-  // Delete existing gallery image
+  // Delete existing image
   const deleteExistingImage = async (image: NewsImage) => {
     const confirmed = window.confirm(
       "Are you sure you want to delete this image?",
@@ -459,32 +398,73 @@ export default function EditNews() {
 
       if (deleteError) throw deleteError;
 
-      const remainingImages = existingImages.filter(
-        (item) => item.id !== image.id,
+      setExistingImages((previous) =>
+        previous.filter((item) => item.id !== image.id),
       );
 
-      setExistingImages(remainingImages);
-
-      // If deleted image was the main image, choose another image
-      if (form.image_url === image.image_url) {
-        updateField(
-          "image_url",
-          remainingImages[0]?.image_url ?? null,
-        );
+      if (primaryImageId === `existing-${image.id}`) {
+        setPrimaryImageId("current");
       }
 
       setSuccess("Image deleted successfully.");
     } catch (err) {
       console.error("Error deleting image:", err);
 
-      setError(err instanceof Error ? err.message : "Failed to delete image.");
+      setError(
+        err instanceof Error ? err.message : "Failed to delete image.",
+      );
     }
+  };
+
+  // Update existing image display size
+  const updateExistingImageSize = (
+    imageId: string,
+    size: DisplaySize,
+  ) => {
+    setExistingImages((previous) =>
+      previous.map((image) =>
+        image.id === imageId ? { ...image, display_size: size } : image,
+      ),
+    );
+  };
+
+  // Update new image display size
+  const updateNewImageSize = (
+    imageId: string,
+    size: DisplaySize,
+    type: "featured" | "gallery",
+  ) => {
+    const setter =
+      type === "featured" ? setNewFeaturedImages : setNewGalleryImages;
+
+    setter((previous) =>
+      previous.map((image) =>
+        image.id === imageId ? { ...image, display_size: size } : image,
+      ),
+    );
+  };
+
+  // Update new image alt text
+  const updateNewImageAlt = (
+    imageId: string,
+    value: string,
+    type: "featured" | "gallery",
+  ) => {
+    const setter =
+      type === "featured" ? setNewFeaturedImages : setNewGalleryImages;
+
+    setter((previous) =>
+      previous.map((image) =>
+        image.id === imageId ? { ...image, alt_text: value } : image,
+      ),
+    );
   };
 
   // Upload image to Supabase Storage
   const uploadImage = async (file: File): Promise<string> => {
-    const fileExtension = file.name.split(".").pop() || "jpg";
+    if (!id) throw new Error("News ID was not found.");
 
+    const fileExtension = file.name.split(".").pop() || "jpg";
     const fileName = `${id}/${crypto.randomUUID()}.${fileExtension}`;
 
     const { error: uploadError } = await supabase.storage
@@ -503,7 +483,7 @@ export default function EditNews() {
     return data.publicUrl;
   };
 
-  // Save changes or publish news
+  // Save news
   const handleSave = async (
     event?: FormEvent<HTMLFormElement>,
     publish = false,
@@ -517,61 +497,86 @@ export default function EditNews() {
       setError("");
       setSuccess("");
 
-      // 1. Upload separately selected featured image
-      let featuredImageUrl = form.image_url;
+      // 1. Upload new featured images
+      const uploadedFeatured = new Map<string, string>();
 
-      if (featuredFile) {
-        featuredImageUrl = await uploadImage(featuredFile);
+      for (const image of newFeaturedImages) {
+        const url = await uploadImage(image.file);
+        uploadedFeatured.set(image.id, url);
       }
 
       // 2. Upload new gallery images
-      const uploadedImages: {
+      const uploadedGallery: {
         news_id: string;
         image_url: string;
         alt_text: string | null;
         display_order: number;
+        display_size: DisplaySize;
+        is_featured: boolean;
       }[] = [];
 
-      // Keep the uploaded URL associated with each new image ID
-      const uploadedImageUrls = new Map<string, string>();
+      for (let index = 0; index < newGalleryImages.length; index++) {
+        const image = newGalleryImages[index];
+        const url = await uploadImage(image.file);
 
-      for (let index = 0; index < newImages.length; index++) {
-        const image = newImages[index];
-
-        const imageUrl = await uploadImage(image.file);
-
-        uploadedImageUrls.set(image.id, imageUrl);
-
-        uploadedImages.push({
+        uploadedGallery.push({
           news_id: id,
-          image_url: imageUrl,
+          image_url: url,
           alt_text: image.alt_text.trim() || null,
           display_order: existingImages.length + index + 1,
+          display_size: image.display_size,
+          is_featured: false,
         });
       }
 
-      // 3. Determine which image should be the main image
-      //
-      // Priority:
-      // 1. Separately uploaded featured image
-      // 2. Newly selected gallery main image
-      // 3. Existing selected main image
-      // 4. First existing gallery image
-      // 5. First newly uploaded gallery image
+      // 3. Determine primary image URL
+      let primaryImageUrl: string | null = form.image_url;
 
-      if (featuredFile) {
-        // Already uploaded above
-      } else if (mainNewImageId) {
-        featuredImageUrl =
-          uploadedImageUrls.get(mainNewImageId) ?? null;
-      } else if (!featuredImageUrl) {
-        featuredImageUrl =
-          existingImages[0]?.image_url ??
-          uploadedImages[0]?.image_url ??
-          null;
+      if (primaryImageId.startsWith("existing-")) {
+        const selectedId = primaryImageId.replace("existing-", "");
+
+        const selectedImage = existingFeaturedImages.find(
+          (image) => image.id === selectedId,
+        );
+
+        if (!selectedImage) {
+          throw new Error("Selected featured image was not found.");
+        }
+
+        primaryImageUrl = selectedImage.image_url;
+      } else if (primaryImageId.startsWith("new-")) {
+        const selectedId = primaryImageId.replace("new-", "");
+
+        primaryImageUrl = uploadedFeatured.get(selectedId) ?? null;
       }
 
-      // 4. Determine publication status
+      // 4. Prepare other featured images
+      const otherFeaturedImages = existingFeaturedImages.filter(
+        (image) =>
+          primaryImageId !== `existing-${image.id}`,
+      );
+
+      const newFeaturedRows = newFeaturedImages
+        .filter((image) => primaryImageId !== `new-${image.id}`)
+        .map((image, index) => {
+          const url = uploadedFeatured.get(image.id);
+
+          if (!url) {
+            throw new Error("Failed to upload a featured image.");
+          }
+
+          return {
+            news_id: id,
+            image_url: url,
+            alt_text: image.alt_text.trim() || null,
+            display_order:
+              existingImages.length + newGalleryImages.length + index + 1,
+            display_size: image.display_size,
+            is_featured: true,
+          };
+        });
+
+      // 5. Publication status
       const nextStatus = publish ? "published" : form.status;
 
       const publishedAt =
@@ -579,24 +584,30 @@ export default function EditNews() {
           ? form.published_at || new Date().toISOString()
           : null;
 
-      // 5. Update news article
+      // 6. Update news table
       const { error: updateError } = await supabase
         .from("news")
         .update({
           title_kh: form.title_kh.trim() || null,
           title_en: form.title_en.trim() || null,
-
           summary_kh: form.summary_kh.trim() ? form.summary_kh : null,
           summary_en: form.summary_en.trim() ? form.summary_en : null,
-
           content_kh: form.content_kh,
           content_en: form.content_en,
-
           category: form.category || null,
-
-          // Save selected main image URL
-          image_url: featuredImageUrl,
-
+          image_url: primaryImageUrl,
+          image_display_size:
+            primaryImageId.startsWith("existing-")
+              ? existingFeaturedImages.find(
+                  (image) =>
+                    primaryImageId === `existing-${image.id}`,
+                )?.display_size ?? form.image_display_size
+              : primaryImageId.startsWith("new-")
+                ? newFeaturedImages.find(
+                    (image) =>
+                      primaryImageId === `new-${image.id}`,
+                  )?.display_size ?? form.image_display_size
+                : form.image_display_size,
           status: nextStatus,
           published_at: publishedAt,
         })
@@ -604,36 +615,88 @@ export default function EditNews() {
 
       if (updateError) throw updateError;
 
-      // 6. Insert new gallery images
-      if (uploadedImages.length > 0) {
-        const { error: galleryError } = await supabase
-          .from("news_images")
-          .insert(uploadedImages);
+      // 7. Update existing featured images
+      // The selected primary image is removed from news_images
+      // because it is now stored in news.image_url.
+      if (primaryImageId.startsWith("existing-")) {
+        const selectedId = primaryImageId.replace("existing-", "");
 
-        if (galleryError) throw galleryError;
+        const { error: deletePrimaryError } = await supabase
+          .from("news_images")
+          .delete()
+          .eq("id", selectedId);
+
+        if (deletePrimaryError) throw deletePrimaryError;
       }
 
-      // 7. Update local state
+      const featuredUpdates = await Promise.all(
+        otherFeaturedImages.map((image) =>
+          supabase
+            .from("news_images")
+            .update({
+              display_size: image.display_size,
+              is_featured: true,
+            })
+            .eq("id", image.id),
+        ),
+      );
+
+      const failedFeaturedUpdate = featuredUpdates.find(
+        (result) => result.error,
+      );
+
+      if (failedFeaturedUpdate?.error) {
+        throw failedFeaturedUpdate.error;
+      }
+
+      // 8. Update existing gallery images
+      const galleryUpdates = await Promise.all(
+        existingGalleryImages.map((image) =>
+          supabase
+            .from("news_images")
+            .update({
+              display_size: image.display_size,
+              is_featured: false,
+            })
+            .eq("id", image.id),
+        ),
+      );
+
+      const failedGalleryUpdate = galleryUpdates.find(
+        (result) => result.error,
+      );
+
+      if (failedGalleryUpdate?.error) {
+        throw failedGalleryUpdate.error;
+      }
+
+      // 9. Insert newly uploaded featured images
+      const allNewRows = [...newFeaturedRows, ...uploadedGallery];
+
+      if (allNewRows.length > 0) {
+        const { error: insertError } = await supabase
+          .from("news_images")
+          .insert(allNewRows);
+
+        if (insertError) throw insertError;
+      }
+
+      // 10. Update local form
       setForm((previous) => ({
         ...previous,
-        image_url: featuredImageUrl,
+        image_url: primaryImageUrl,
         status: nextStatus,
         published_at: publishedAt,
       }));
 
-      // 8. Clean up temporary previews
-      if (featuredPreview) {
-        revokePreview(featuredPreview);
-      }
-
-      newImages.forEach((image) => {
+      // 11. Clean up previews
+      [...newFeaturedImages, ...newGalleryImages].forEach((image) => {
         revokePreview(image.preview);
       });
 
-      setFeaturedFile(null);
-      setFeaturedPreview(null);
-      setNewImages([]);
-      setMainNewImageId(null);
+      setNewFeaturedImages([]);
+      setNewGalleryImages([]);
+      setPrimaryImageId("current");
 
       setSuccess(
         nextStatus === "published"
@@ -641,12 +704,13 @@ export default function EditNews() {
           : "News updated successfully.",
       );
 
-      // Reload saved data
       await loadNews();
     } catch (err) {
       console.error("Error saving news:", err);
 
-      setError(err instanceof Error ? err.message : "Failed to save news.");
+      setError(
+        err instanceof Error ? err.message : "Failed to save news.",
+      );
     } finally {
       setSaving(false);
     }
@@ -661,7 +725,6 @@ export default function EditNews() {
     );
   }
 
-  // Error screen
   if (!id) {
     return (
       <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-red-700">
@@ -716,8 +779,11 @@ export default function EditNews() {
         </div>
       )}
 
-      <form onSubmit={(event) => void handleSave(event)} className="space-y-6">
-        {/* Titles */}
+      <form
+        onSubmit={(event) => void handleSave(event)}
+        className="space-y-6"
+      >
+        {/* 1. News Title */}
         <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
           <h2 className="mb-5 text-lg font-semibold text-gray-900">
             News Title
@@ -740,7 +806,8 @@ export default function EditNews() {
                   updateField("title_kh", event.target.value)
                 }
                 placeholder="បញ្ចូលចំណងជើងព័ត៌មាន..."
-                className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                disabled={saving}
+                className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:opacity-50"
               />
             </div>
 
@@ -760,21 +827,22 @@ export default function EditNews() {
                   updateField("title_en", event.target.value)
                 }
                 placeholder="Enter news title..."
-                className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                disabled={saving}
+                className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:opacity-50"
               />
             </div>
           </div>
         </section>
 
-        {/* Summary */}
+        {/* 2. Summary */}
         <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
           <h2 className="mb-2 text-lg font-semibold text-gray-900">
             Short Summary
           </h2>
 
           <p className="mb-5 text-sm text-gray-500">
-            Press Tab to insert four spaces. Press Enter for a new line. Spaces
-            and line breaks are preserved when saving.
+            Press Tab to insert four spaces. Press Enter for a new line.
+            Spaces and line breaks are preserved when saving.
           </p>
 
           <div className="grid gap-5 md:grid-cols-2">
@@ -793,9 +861,12 @@ export default function EditNews() {
                 onChange={(event) =>
                   updateField("summary_kh", event.target.value)
                 }
-                onKeyDown={(event) => handleTextareaTab(event, "summary_kh")}
+                onKeyDown={(event) =>
+                  handleTextareaTab(event, "summary_kh")
+                }
                 placeholder="សរសេរសេចក្ដីសង្ខេបព័ត៌មាន..."
-                className="w-full resize-y rounded-xl border border-gray-300 px-4 py-3 text-sm leading-7 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                disabled={saving}
+                className="w-full resize-y rounded-xl border border-gray-300 px-4 py-3 text-sm leading-7 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:opacity-50"
               />
             </div>
 
@@ -814,23 +885,274 @@ export default function EditNews() {
                 onChange={(event) =>
                   updateField("summary_en", event.target.value)
                 }
-                onKeyDown={(event) => handleTextareaTab(event, "summary_en")}
+                onKeyDown={(event) =>
+                  handleTextareaTab(event, "summary_en")
+                }
                 placeholder="Write a short summary..."
-                className="w-full resize-y rounded-xl border border-gray-300 px-4 py-3 text-sm leading-7 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                disabled={saving}
+                className="w-full resize-y rounded-xl border border-gray-300 px-4 py-3 text-sm leading-7 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:opacity-50"
               />
             </div>
           </div>
         </section>
 
-        {/* Content */}
+        {/* 3. Featured Images */}
+        <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
+          <div className="mb-5">
+            <h2 className="text-lg font-semibold text-gray-900">
+              Featured Images
+            </h2>
+
+            <p className="mt-1 text-sm text-gray-500">
+              All featured images are managed here. Select one image as the
+              primary image.
+            </p>
+          </div>
+
+          <input
+            ref={featuredInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            onChange={handleFeaturedImages}
+            className="hidden"
+          />
+
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+            {/* Current Primary Image */}
+            {form.image_url && (
+              <div
+                className={`overflow-hidden rounded-xl border-2 ${
+                  primaryImageId === "current"
+                    ? "border-blue-500"
+                    : "border-gray-200"
+                }`}
+              >
+                <div className="relative aspect-square bg-gray-100">
+                  <img
+                    src={form.image_url}
+                    alt="Primary featured image"
+                    className="h-full w-full object-cover"
+                  />
+
+                  <span className="absolute left-2 top-2 rounded-md bg-blue-600 px-2 py-1 text-xs font-semibold text-white">
+                    Current Primary
+                  </span>
+                </div>
+
+                <div className="p-3">
+                  <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-gray-700">
+                    <input
+                      type="radio"
+                      name="primaryFeaturedImage"
+                      checked={primaryImageId === "current"}
+                      onChange={() => setPrimaryImageId("current")}
+                      disabled={saving}
+                      className="h-4 w-4 accent-blue-600"
+                    />
+                    Primary Image
+                  </label>
+
+                  <label className="mt-3 block text-xs font-medium text-gray-600">
+                    Display Size
+
+                    <select
+                      value={form.image_display_size}
+                      onChange={(event) =>
+                        updateField(
+                          "image_display_size",
+                          event.target.value as DisplaySize,
+                        )
+                      }
+                      disabled={saving}
+                      className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-2 py-2 text-xs"
+                    >
+                      <option value="large">Large</option>
+                      <option value="medium">Medium</option>
+                      <option value="small">Small</option>
+                    </select>
+                  </label>
+                </div>
+              </div>
+            )}
+
+            {/* Existing Additional Featured Images */}
+            {existingFeaturedImages.map((image) => {
+              const selected = primaryImageId === `existing-${image.id}`;
+
+              return (
+                <div
+                  key={image.id}
+                  className={`overflow-hidden rounded-xl border-2 ${
+                    selected ? "border-blue-500" : "border-gray-200"
+                  }`}
+                >
+                  <div className="relative aspect-square bg-gray-100">
+                    <img
+                      src={image.image_url}
+                      alt={image.alt_text || "Featured image"}
+                      className="h-full w-full object-cover"
+                    />
+
+                    <span className="absolute left-2 top-2 rounded-md bg-blue-600 px-2 py-1 text-xs font-semibold text-white">
+                      Featured
+                    </span>
+
+                    <button
+                      type="button"
+                      onClick={() => void deleteExistingImage(image)}
+                      disabled={saving}
+                      className="absolute right-2 top-2 rounded-lg bg-red-600 p-2 text-white hover:bg-red-700 disabled:opacity-50"
+                      aria-label="Delete featured image"
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                  </div>
+
+                  <div className="space-y-3 p-3">
+                    <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-gray-700">
+                      <input
+                        type="radio"
+                        name="primaryFeaturedImage"
+                        checked={selected}
+                        onChange={() =>
+                          setPrimaryImageId(`existing-${image.id}`)
+                        }
+                        disabled={saving}
+                        className="h-4 w-4 accent-blue-600"
+                      />
+                      Primary Image
+                    </label>
+
+                    <label className="block text-xs font-medium text-gray-600">
+                      Display Size
+
+                      <select
+                        value={image.display_size}
+                        onChange={(event) =>
+                          updateExistingImageSize(
+                            image.id,
+                            event.target.value as DisplaySize,
+                          )
+                        }
+                        disabled={saving}
+                        className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-2 py-2 text-xs"
+                      >
+                        <option value="large">Large</option>
+                        <option value="medium">Medium</option>
+                        <option value="small">Small</option>
+                      </select>
+                    </label>
+                  </div>
+                </div>
+              );
+            })}
+
+            {/* New Featured Images */}
+            {newFeaturedImages.map((image) => {
+              const selected = primaryImageId === `new-${image.id}`;
+
+              return (
+                <div
+                  key={image.id}
+                  className={`overflow-hidden rounded-xl border-2 ${
+                    selected ? "border-blue-500" : "border-blue-200"
+                  }`}
+                >
+                  <div className="relative aspect-square bg-gray-100">
+                    <img
+                      src={image.preview}
+                      alt={image.alt_text || "New featured image"}
+                      className="h-full w-full object-cover"
+                    />
+
+                    <span className="absolute left-2 top-2 rounded-md bg-blue-600 px-2 py-1 text-xs font-semibold text-white">
+                      New Featured
+                    </span>
+
+                    <button
+                      type="button"
+                      onClick={() => removeNewFeaturedImage(image.id)}
+                      disabled={saving}
+                      className="absolute right-2 top-2 rounded-lg bg-red-600 p-2 text-white hover:bg-red-700 disabled:opacity-50"
+                      aria-label="Remove featured image"
+                    >
+                      <X size={15} />
+                    </button>
+                  </div>
+
+                  <div className="space-y-3 p-3">
+                    <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-gray-700">
+                      <input
+                        type="radio"
+                        name="primaryFeaturedImage"
+                        checked={selected}
+                        onChange={() =>
+                          setPrimaryImageId(`new-${image.id}`)
+                        }
+                        disabled={saving}
+                        className="h-4 w-4 accent-blue-600"
+                      />
+                      Primary Image
+                    </label>
+
+                    <label className="block text-xs font-medium text-gray-600">
+                      Display Size
+
+                      <select
+                        value={image.display_size}
+                        onChange={(event) =>
+                          updateNewImageSize(
+                            image.id,
+                            event.target.value as DisplaySize,
+                            "featured",
+                          )
+                        }
+                        disabled={saving}
+                        className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-2 py-2 text-xs"
+                      >
+                        <option value="large">Large</option>
+                        <option value="medium">Medium</option>
+                        <option value="small">Small</option>
+                      </select>
+                    </label>
+                  </div>
+                </div>
+              );
+            })}
+
+            {/* Add Featured Images */}
+            <button
+              type="button"
+              onClick={() => featuredInputRef.current?.click()}
+              disabled={saving}
+              className="flex aspect-square flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed border-gray-300 text-gray-500 transition hover:border-blue-500 hover:bg-blue-50 hover:text-blue-600 disabled:opacity-50"
+            >
+              <div className="rounded-full bg-gray-100 p-3">
+                <ImageIcon size={22} />
+              </div>
+
+              <span className="text-sm font-medium">
+                Add Featured Images
+              </span>
+            </button>
+          </div>
+
+          <p className="mt-4 text-xs text-gray-500">
+            Select one image as Primary. Other featured images will be saved
+            separately. Each image must be smaller than 5MB.
+          </p>
+        </section>
+
+        {/* 4. Article Content */}
         <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
           <h2 className="mb-2 text-lg font-semibold text-gray-900">
-            News Content
+            Article Content
           </h2>
 
           <p className="mb-5 text-sm text-gray-500">
-            Press Tab to insert four spaces. Press Enter for a new line. Spaces
-            and line breaks are preserved when saving.
+            Press Tab to insert four spaces. Press Enter for a new line.
+            Spaces and line breaks are preserved when saving.
           </p>
 
           <div className="grid gap-5 md:grid-cols-2">
@@ -849,9 +1171,12 @@ export default function EditNews() {
                 onChange={(event) =>
                   updateField("content_kh", event.target.value)
                 }
-                onKeyDown={(event) => handleTextareaTab(event, "content_kh")}
+                onKeyDown={(event) =>
+                  handleTextareaTab(event, "content_kh")
+                }
                 placeholder="សរសេរខ្លឹមសារព័ត៌មាន..."
-                className="w-full resize-y rounded-xl border border-gray-300 px-4 py-3 text-sm leading-7 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                disabled={saving}
+                className="w-full resize-y rounded-xl border border-gray-300 px-4 py-3 text-sm leading-7 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:opacity-50"
               />
             </div>
 
@@ -870,126 +1195,34 @@ export default function EditNews() {
                 onChange={(event) =>
                   updateField("content_en", event.target.value)
                 }
-                onKeyDown={(event) => handleTextareaTab(event, "content_en")}
+                onKeyDown={(event) =>
+                  handleTextareaTab(event, "content_en")
+                }
                 placeholder="Write news content..."
-                className="w-full resize-y rounded-xl border border-gray-300 px-4 py-3 text-sm leading-7 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                disabled={saving}
+                className="w-full resize-y rounded-xl border border-gray-300 px-4 py-3 text-sm leading-7 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:opacity-50"
               />
             </div>
           </div>
         </section>
 
-        {/* Category */}
-        <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
-          <h2 className="mb-5 text-lg font-semibold text-gray-900">Category</h2>
-
-          <select
-            value={form.category}
-            onChange={(event) => updateField("category", event.target.value)}
-            className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-          >
-            <option value="">Select a category</option>
-
-            {categories.map((category) => (
-              <option key={category.id} value={category.slug}>
-                {category.name_en} / {category.name_kh}
-              </option>
-            ))}
-          </select>
-        </section>
-
-        {/* Featured Image */}
-        <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
-          <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-            <h2 className="text-lg font-semibold text-gray-900">
-              Featured / Main Image
-            </h2>
-
-            {hasSelectedMainImage ? (
-              <span className="rounded-full bg-green-100 px-3 py-1 text-xs font-medium text-green-700">
-                Main image selected
-              </span>
-            ) : (
-              <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-600">
-                No image
-              </span>
-            )}
-          </div>
-
-          <input
-            ref={featuredInputRef}
-            type="file"
-            accept="image/*"
-            onChange={handleFeaturedImage}
-            className="hidden"
-          />
-
-          {featuredDisplayImage ? (
-            <div className="mb-4">
-              <div className="relative overflow-hidden rounded-xl border border-gray-200">
-                <img
-                  src={featuredDisplayImage}
-                  alt="Main image preview"
-                  className="max-h-96 w-full object-cover"
-                />
-
-                <button
-                  type="button"
-                  onClick={removeFeaturedImage}
-                  disabled={saving}
-                  className="absolute right-3 top-3 inline-flex items-center gap-2 rounded-lg bg-red-600 px-3 py-2 text-sm font-medium text-white shadow-md transition hover:bg-red-700 disabled:opacity-50"
-                >
-                  <Trash2 size={16} />
-                  Remove Main Image
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="mb-4 flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-gray-300 bg-gray-50 px-5 py-12 text-center">
-              <div className="mb-3 rounded-full bg-gray-100 p-4">
-                <ImageIcon size={30} className="text-gray-400" />
-              </div>
-
-              <p className="text-sm font-medium text-gray-700">
-                No main image
-              </p>
-
-              <p className="mt-1 text-xs text-gray-500">
-                Select an Additional Image or upload a featured image.
-              </p>
-            </div>
-          )}
-
-          <button
-            type="button"
-            onClick={() => featuredInputRef.current?.click()}
-            disabled={saving}
-            className="inline-flex items-center gap-2 rounded-xl border border-gray-300 px-4 py-3 text-sm font-medium text-gray-700 transition hover:border-blue-500 hover:text-blue-600 disabled:opacity-50"
-          >
-            <Upload size={17} />
-            Upload Featured Image
-          </button>
-
-          <p className="mt-2 text-xs text-gray-500">
-            You can upload a separate featured image or select one from
-            Additional Images below. Maximum file size: 5MB.
-          </p>
-        </section>
-
-        {/* Additional Gallery Images */}
+        {/* 5. Photo Gallery */}
         <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
           <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 className="text-lg font-semibold text-gray-900">
-                Additional Images
+                Photo Gallery
               </h2>
 
               <p className="mt-1 text-sm text-gray-500">
-                Manage images and choose which one appears as the main image.
+                Manage additional photos displayed below the article content.
+                Featured images are not displayed here.
               </p>
             </div>
 
             <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-600">
-              {existingImages.length + newImages.length}/{MAX_IMAGES} images
+              {existingGalleryImages.length + newGalleryImages.length}/
+              {MAX_IMAGES} images
             </span>
           </div>
 
@@ -1003,137 +1236,129 @@ export default function EditNews() {
           />
 
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-            {/* Existing images */}
-            {existingImages.map((image) => {
-              const isMainImage = form.image_url === image.image_url;
+            {/* Existing Gallery Images */}
+            {existingGalleryImages.map((image) => (
+              <div
+                key={image.id}
+                className="group overflow-hidden rounded-xl border border-gray-200"
+              >
+                <div className="relative aspect-square bg-gray-100">
+                  <img
+                    src={image.image_url}
+                    alt={image.alt_text || "Gallery image"}
+                    className="h-full w-full object-cover"
+                  />
 
-              return (
-                <div
-                  key={image.id}
-                  className={`group overflow-hidden rounded-xl border ${
-                    isMainImage
-                      ? "border-green-400 ring-2 ring-green-100"
-                      : "border-gray-200"
-                  }`}
-                >
-                  <div className="relative aspect-square bg-gray-100">
-                    <img
-                      src={image.image_url}
-                      alt={image.alt_text || "News image"}
-                      className="h-full w-full object-cover"
-                    />
-
-                    {isMainImage && (
-                      <span className="absolute bottom-2 left-2 rounded-md bg-green-600 px-2 py-1 text-xs font-semibold text-white shadow">
-                        Main Image
-                      </span>
-                    )}
-
-                    <button
-                      type="button"
-                      onClick={() => void deleteExistingImage(image)}
-                      disabled={saving}
-                      className="absolute right-2 top-2 rounded-lg bg-red-600 p-2 text-white opacity-100 transition hover:bg-red-700 disabled:opacity-50 sm:opacity-0 sm:group-hover:opacity-100"
-                      aria-label="Delete image"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-
-                  <div className="space-y-2 p-2">
-                    <p className="truncate text-xs text-gray-500">
-                      Existing image
-                    </p>
-
-                    {isMainImage ? (
-                      <span className="block rounded-lg bg-green-100 px-3 py-2 text-center text-xs font-semibold text-green-700">
-                        <Check size={14} className="mr-1 inline" />
-                        Main Image
-                      </span>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => setAsMainImage(image)}
-                        disabled={saving}
-                        className="w-full rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 transition hover:bg-blue-100 disabled:opacity-50"
-                      >
-                        Set as Main Image
-                      </button>
-                    )}
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void deleteExistingImage(image)}
+                    disabled={saving}
+                    className="absolute right-2 top-2 rounded-lg bg-red-600 p-2 text-white opacity-100 transition hover:bg-red-700 disabled:opacity-50 sm:opacity-0 sm:group-hover:opacity-100"
+                    aria-label="Delete gallery image"
+                  >
+                    <Trash2 size={16} />
+                  </button>
                 </div>
-              );
-            })}
 
-            {/* Newly selected images */}
-            {newImages.map((image) => {
-              const isMainImage = mainNewImageId === image.id;
+                <div className="space-y-3 p-3">
+                  <p className="truncate text-xs text-gray-500">
+                    Existing gallery image
+                  </p>
 
-              return (
-                <div
-                  key={image.id}
-                  className={`overflow-hidden rounded-xl border ${
-                    isMainImage
-                      ? "border-green-400 ring-2 ring-green-100"
-                      : "border-blue-200"
-                  }`}
-                >
-                  <div className="relative aspect-square bg-gray-100">
-                    <img
-                      src={image.preview}
-                      alt="New image preview"
-                      className="h-full w-full object-cover"
-                    />
+                  <label className="block text-xs font-medium text-gray-600">
+                    Display Size
 
-                    <button
-                      type="button"
-                      onClick={() => removeNewImage(image.id)}
-                      disabled={saving}
-                      className="absolute right-2 top-2 rounded-lg bg-red-600 p-2 text-white transition hover:bg-red-700 disabled:opacity-50"
-                      aria-label="Remove image"
-                    >
-                      <X size={16} />
-                    </button>
-
-                    <span className="absolute bottom-2 left-2 rounded-md bg-blue-600 px-2 py-1 text-xs font-medium text-white">
-                      New
-                    </span>
-                  </div>
-
-                  <div className="space-y-2 p-2">
-                    <input
-                      type="text"
-                      value={image.alt_text}
+                    <select
+                      value={image.display_size}
                       onChange={(event) =>
-                        updateNewImageAlt(image.id, event.target.value)
+                        updateExistingImageSize(
+                          image.id,
+                          event.target.value as DisplaySize,
+                        )
                       }
-                      placeholder="Image description"
                       disabled={saving}
-                      className="w-full rounded-lg border border-gray-200 px-2 py-2 text-xs outline-none focus:border-blue-500 disabled:opacity-50"
-                    />
-
-                    {isMainImage ? (
-                      <span className="block rounded-lg bg-green-100 px-3 py-2 text-center text-xs font-semibold text-green-700">
-                        <Check size={14} className="mr-1 inline" />
-                        Main Image
-                      </span>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => setNewImageAsMain(image)}
-                        disabled={saving}
-                        className="w-full rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 transition hover:bg-blue-100 disabled:opacity-50"
-                      >
-                        Set as Main Image
-                      </button>
-                    )}
-                  </div>
+                      className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-2 py-2 text-xs"
+                    >
+                      <option value="large">Large</option>
+                      <option value="medium">Medium</option>
+                      <option value="small">Small</option>
+                    </select>
+                  </label>
                 </div>
-              );
-            })}
+              </div>
+            ))}
 
-            {/* Add image button */}
-            {existingImages.length + newImages.length < MAX_IMAGES && (
+            {/* New Gallery Images */}
+            {newGalleryImages.map((image) => (
+              <div
+                key={image.id}
+                className="overflow-hidden rounded-xl border border-blue-200"
+              >
+                <div className="relative aspect-square bg-gray-100">
+                  <img
+                    src={image.preview}
+                    alt={image.alt_text || "New gallery image"}
+                    className="h-full w-full object-cover"
+                  />
+
+                  <button
+                    type="button"
+                    onClick={() => removeNewGalleryImage(image.id)}
+                    disabled={saving}
+                    className="absolute right-2 top-2 rounded-lg bg-red-600 p-2 text-white transition hover:bg-red-700 disabled:opacity-50"
+                    aria-label="Remove new gallery image"
+                  >
+                    <X size={16} />
+                  </button>
+
+                  <span className="absolute bottom-2 left-2 rounded-md bg-blue-600 px-2 py-1 text-xs font-medium text-white">
+                    New Image
+                  </span>
+                </div>
+
+                <div className="space-y-3 p-3">
+                  <input
+                    type="text"
+                    value={image.alt_text}
+                    onChange={(event) =>
+                      updateNewImageAlt(
+                        image.id,
+                        event.target.value,
+                        "gallery",
+                      )
+                    }
+                    placeholder="Image description"
+                    disabled={saving}
+                    className="w-full rounded-lg border border-gray-200 px-2 py-2 text-xs outline-none focus:border-blue-500 disabled:opacity-50"
+                  />
+
+                  <label className="block text-xs font-medium text-gray-600">
+                    Display Size
+
+                    <select
+                      value={image.display_size}
+                      onChange={(event) =>
+                        updateNewImageSize(
+                          image.id,
+                          event.target.value as DisplaySize,
+                          "gallery",
+                        )
+                      }
+                      disabled={saving}
+                      className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-2 py-2 text-xs"
+                    >
+                      <option value="large">Large</option>
+                      <option value="medium">Medium</option>
+                      <option value="small">Small</option>
+                    </select>
+                  </label>
+                </div>
+              </div>
+            ))}
+
+            {/* Add Gallery Images */}
+            {existingGalleryImages.length + newGalleryImages.length <
+              MAX_IMAGES && (
               <button
                 type="button"
                 onClick={() => galleryInputRef.current?.click()}
@@ -1150,11 +1375,34 @@ export default function EditNews() {
           </div>
 
           <p className="mt-4 text-xs text-gray-500">
-            Maximum {MAX_IMAGES} images. Each image must be smaller than 5MB.
+            Maximum {MAX_IMAGES} gallery images. Each image must be smaller
+            than 5MB.
           </p>
         </section>
 
-        {/* Status */}
+        {/* 6. Category */}
+        <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
+          <h2 className="mb-5 text-lg font-semibold text-gray-900">
+            Category
+          </h2>
+
+          <select
+            value={form.category}
+            onChange={(event) => updateField("category", event.target.value)}
+            disabled={saving}
+            className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:opacity-50"
+          >
+            <option value="">Select a category</option>
+
+            {categories.map((category) => (
+              <option key={category.id} value={category.slug}>
+                {category.name_en} / {category.name_kh}
+              </option>
+            ))}
+          </select>
+        </section>
+
+        {/* 7. Publication Status */}
         <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
           <h2 className="mb-5 text-lg font-semibold text-gray-900">
             Publication Status
@@ -1195,6 +1443,7 @@ export default function EditNews() {
               ) : (
                 <Save size={17} />
               )}
+
               Save Changes
             </button>
 
@@ -1209,6 +1458,7 @@ export default function EditNews() {
               ) : (
                 <Send size={17} />
               )}
+
               Publish
             </button>
           </div>
@@ -1217,3 +1467,4 @@ export default function EditNews() {
     </div>
   );
 }
+

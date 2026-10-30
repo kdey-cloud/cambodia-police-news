@@ -184,7 +184,7 @@ export default function Footer() {
   <div className="flex flex-wrap gap-3">
     {/* Facebook */}
     <a
-      href="https://www.facebook.com/"
+      href="https://www.facebook.com/pac.edu.kh/"
       target="_blank"
       rel="noreferrer"
       aria-label="Facebook"
@@ -201,7 +201,7 @@ export default function Footer() {
 
 {/* YouTube */}
 <a
-  href="https://www.youtube.com/"
+  href="https://www.youtube.com/user/pacvideosable"
   target="_blank"
   rel="noreferrer"
   aria-label="YouTube"
@@ -217,7 +217,7 @@ export default function Footer() {
 
 {/* Telegram */}
 <a
-  href="https://telegram.org/"
+  href="https://t.me/pacedu"
   target="_blank"
   rel="noreferrer"
   aria-label="Telegram"
@@ -233,7 +233,7 @@ export default function Footer() {
 
 {/* TikTok */}
 <a
-  href="https://www.tiktok.com/"
+  href="https://www.tiktok.com/@paccambodia"
   target="_blank"
   rel="noreferrer"
   aria-label="TikTok"
@@ -249,7 +249,7 @@ export default function Footer() {
 
 {/* CoolApp Cambodia */}
 <a
-  href="https://www.facebook.com/"
+  href="https://group.coolapp.chat/#CjQKIClXWitpYfwr3tFGQDgeAdqSeEIyX1bBUfk-hQ0LMkLbEhAE5gmcVkMpWsd5WBIwmo7r"
   target="_blank"
   rel="noreferrer"
   aria-label="CoolApp Cambodia"
