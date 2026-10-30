@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import RouteLoading from "../../components/common/RouteLoading";
+
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
@@ -123,19 +123,7 @@ export default function CompositionAndLeadership() {
         <div className="grid grid-cols-1 items-start gap-8 lg:grid-cols-[minmax(0,1fr)_300px]">
           {/* Leadership */}
           <article className="order-1 min-w-0">
-            {/* Loading */}
-{loadingLeaders && (
-  <div className="rounded-lg border border-gray-200 bg-white">
-    <RouteLoading
-      message={
-        isKhmer
-          ? "កំពុងផ្ទុកព័ត៌មានថ្នាក់ដឹកនាំ..."
-          : "Loading leadership information..."
-      }
-    />
-  </div>
-)}
-
+            
             {/* Error */}
             {!loadingLeaders && leaderError && (
               <div

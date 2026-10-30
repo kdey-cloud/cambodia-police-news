@@ -26,6 +26,8 @@ import ManageNews from "./pages/admin/ManageNews";
 import CreateNews from "./pages/admin/CreateNews";
 import Categories from "./pages/admin/Categories";
 import MediaLibrary from "./pages/admin/MediaLibrary";
+import EditNews from "./pages/admin/EditNews";
+
 
 function PublicLayout() {
   return (
@@ -100,7 +102,8 @@ function AppContent() {
         <Route index element={<AdminDashboard />} />
         <Route path="dashboard" element={<AdminDashboard />} />
         <Route path="news" element={<ManageNews />} />
-        <Route path="news/new" element={<CreateNews />} />
+        <Route path="news/edit/:id" element={<EditNews />} />
+        <Route path="news/create" element={<CreateNews />} />
         <Route path="categories" element={<Categories />} />
         <Route path="media" element={<MediaLibrary />} />
       </Route>

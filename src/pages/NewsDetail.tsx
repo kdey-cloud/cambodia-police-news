@@ -1,6 +1,8 @@
-import { useEffect, useState } from "react";
+
+import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import DOMPurify from "dompurify";
 import {
   ArrowLeft,
   ArrowRight,
@@ -10,6 +12,9 @@ import {
   Share2,
   Shield,
   Tag,
+  Send,
+  Copy,
+  Check,
 } from "lucide-react";
 import { supabase } from "../lib/supabase";
 
@@ -36,13 +41,6 @@ type NewsImage = {
   display_order: number;
 };
 
-type GalleryImage = {
-  id: string;
-  image_url: string;
-  alt_text: string | null;
-  display_order: number;
-};
-
 type RecentArticle = {
   id: string;
   title_kh: string | null;
@@ -60,14 +58,17 @@ function formatDate(dateString: string | null, language: string) {
 
   if (Number.isNaN(date.getTime())) return "";
 
-  return new Intl.DateTimeFormat(
-    language.toLowerCase().startsWith("kh") ? "kh-KH" : "en-GB",
-    {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    },
-  ).format(date);
+  const locale =
+    language.toLowerCase().startsWith("kh") ||
+    language.toLowerCase().startsWith("km")
+      ? "km-KH"
+      : "en-GB";
+
+  return new Intl.DateTimeFormat(locale, {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  }).format(date);
 }
 
 function getTitle(
@@ -79,22 +80,94 @@ function getTitle(
     : article.title_en?.trim() || article.title_kh?.trim() || "";
 }
 
+// Preserve line breaks in Summary.
 function getSummary(
   article: Pick<NewsArticle, "summary_kh" | "summary_en">,
   isKhmer: boolean,
 ) {
-  return isKhmer
-    ? article.summary_kh?.trim() || article.summary_en?.trim() || ""
-    : article.summary_en?.trim() || article.summary_kh?.trim() || "";
+  const text = isKhmer
+    ? article.summary_kh || article.summary_en || ""
+    : article.summary_en || article.summary_kh || "";
+
+  return text.replace(/\r\n?/g, "\n");
 }
 
+// Preserve line breaks in News Content.
 function getContent(
   article: Pick<NewsArticle, "content_kh" | "content_en">,
   isKhmer: boolean,
 ) {
-  return isKhmer
-    ? article.content_kh?.trim() || article.content_en?.trim() || ""
-    : article.content_en?.trim() || article.content_kh?.trim() || "";
+  const text = isKhmer
+    ? article.content_kh || article.content_en || ""
+    : article.content_en || article.content_kh || "";
+
+  return text.replace(/\r\n?/g, "\n");
+}
+
+/**
+ * Remove accidental Markdown image syntax and standalone image URLs.
+ * Preserve real HTML images inserted through the rich-text editor.
+ */
+function cleanArticleContent(content: string | null | undefined): string {
+  if (!content) return "";
+
+  return (
+    content
+      // Remove Markdown image syntax.
+      .replace(/!\[[^\]]*\]\([^)]+\)/gi, "")
+
+      // Remove Markdown links pointing to image files.
+      .replace(
+        /\[([^\]]+)\]\(\s*<?https?:\/\/[^)\s>]+\.(?:jpg|jpeg|png|webp|gif|avif|svg)(?:\?[^)\s>]*)?>?\s*\)/gi,
+        "",
+      )
+
+      // Remove standalone image URLs.
+      .replace(
+        /https?:\/\/[^\s<>"')]+\.(?:jpg|jpeg|png|webp|gif|avif|svg)(?:\?[^\s<>"')]*)?/gi,
+        "",
+      )
+
+      // Remove standalone image filenames.
+      .replace(
+        /^[ \t]*[\w-]+(?:_[\w-]+)*\.(?:jpg|jpeg|png|webp|gif|avif|svg)[ \t]*$/gim,
+        "",
+      )
+  );
+}
+
+/**
+ * Sanitize article HTML before rendering.
+ */
+function sanitizeArticleContent(content: string | null | undefined): string {
+  if (!content) return "";
+
+  return DOMPurify.sanitize(content, {
+    USE_PROFILES: {
+      html: true,
+    },
+    FORBID_TAGS: ["style", "script", "iframe", "object", "embed"],
+    FORBID_ATTR: ["onerror", "onload"],
+  });
+}
+
+/**
+ * Determine whether the article contains meaningful text or media.
+ */
+function hasArticleContent(html: string): boolean {
+  if (!html.trim()) return false;
+
+  const text = html
+    .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, "")
+    .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, "")
+    .replace(/<[^>]*>/g, "")
+    .replace(/&nbsp;|&#160;|&#xA0;|&#8203;/gi, "")
+    .replace(/\u200B/g, "")
+    .trim();
+
+  const hasMedia = /<(img|video|audio|figure)\b/i.test(html);
+
+  return text.length > 0 || hasMedia;
 }
 
 function getCategoryLabel(category: string | null, isKhmer: boolean) {
@@ -103,9 +176,18 @@ function getCategoryLabel(category: string | null, isKhmer: boolean) {
   }
 
   const labels: Record<string, { en: string; kh: string }> = {
-    activities: { en: "Activities", kh: "សកម្មភាព" },
-    announcement: { en: "Announcement", kh: "សេចក្តីជូនដំណឹង" },
-    meeting: { en: "Meeting", kh: "កិច្ចប្រជុំ" },
+    activities: {
+      en: "Activities",
+      kh: "សកម្មភាព",
+    },
+    announcement: {
+      en: "Announcement",
+      kh: "សេចក្តីជូនដំណឹង",
+    },
+    meeting: {
+      en: "Meeting",
+      kh: "កិច្ចប្រជុំ",
+    },
   };
 
   const normalized = category.toLowerCase();
@@ -121,17 +203,41 @@ export default function NewsDetail() {
   const { id } = useParams<{ id: string }>();
   const { i18n } = useTranslation();
 
-  const isKhmer = i18n.language.toLowerCase().startsWith("kh");
+  const isKhmer =
+    i18n.language.toLowerCase().startsWith("kh") ||
+    i18n.language.toLowerCase().startsWith("km");
 
   const [article, setArticle] = useState<NewsArticle | null>(null);
-  const [images, setImages] = useState<GalleryImage[]>([]);
+  const [images, setImages] = useState<NewsImage[]>([]);
   const [recentNews, setRecentNews] = useState<RecentArticle[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
-  const [shareMessage, setShareMessage] = useState("");
+  const [showShareOptions, setShowShareOptions] = useState(false);
+  const [copied, setCopied] = useState(false);
   const [activeImage, setActiveImage] = useState<string | null>(null);
 
-  // Load article and combine the first image with all additional images.
+  // Reference for detecting clicks outside the share dropdown.
+  const shareDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close the share dropdown when clicking outside it.
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        shareDropdownRef.current &&
+        !shareDropdownRef.current.contains(event.target as Node)
+      ) {
+        setShowShareOptions(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside);
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  // Load the published article and its additional images.
   useEffect(() => {
     let active = true;
 
@@ -147,6 +253,7 @@ export default function NewsDetail() {
             ? "មិនមានលេខសម្គាល់ព័ត៌មានទេ។"
             : "The news article ID is missing.",
         );
+
         setLoading(false);
         return;
       }
@@ -206,39 +313,16 @@ export default function NewsDetail() {
         ? []
         : ((imageData ?? []) as NewsImage[]);
 
-      // The first image is stored in news.image_url.
-      // All remaining images are stored in news_images.
-      // Combine them into one gallery instead of showing a separate cover.
-      const allImages: GalleryImage[] = [
-        ...(currentArticle.image_url
-          ? [
-              {
-                id: `main-${currentArticle.id}`,
-                image_url: currentArticle.image_url,
-                alt_text:
-                  currentArticle.title_en || currentArticle.title_kh || "",
-                display_order: 1,
-              },
-            ]
-          : []),
-        ...additionalImages.map((image) => ({
-          id: image.id,
-          image_url: image.image_url,
-          alt_text: image.alt_text,
-          display_order: image.display_order,
-        })),
-      ];
-
-      // Avoid displaying the same image twice if the URL was saved in both places.
-      const uniqueImages = allImages.filter(
-        (image, index, array) =>
-          image.image_url &&
-          array.findIndex(
-            (candidate) => candidate.image_url === image.image_url,
-          ) === index,
-      );
-
-      uniqueImages.sort((a, b) => a.display_order - b.display_order);
+      const uniqueImages = additionalImages
+        .filter(
+          (image, index, array) =>
+            Boolean(image.image_url) &&
+            image.image_url !== currentArticle.image_url &&
+            array.findIndex(
+              (candidate) => candidate.image_url === image.image_url,
+            ) === index,
+        )
+        .sort((a, b) => a.display_order - b.display_order);
 
       setImages(uniqueImages);
       setLoading(false);
@@ -251,7 +335,7 @@ export default function NewsDetail() {
     };
   }, [id, isKhmer]);
 
-  // Load recent published news.
+  // Load recent published articles.
   useEffect(() => {
     let active = true;
 
@@ -266,8 +350,10 @@ export default function NewsDetail() {
           ascending: false,
           nullsFirst: false,
         })
-        .order("created_at", { ascending: false })
-        .limit(6);
+        .order("created_at", {
+          ascending: false,
+        })
+        .limit(7);
 
       if (!active) return;
 
@@ -277,7 +363,9 @@ export default function NewsDetail() {
       }
 
       setRecentNews(
-        ((data ?? []) as RecentArticle[]).filter((item) => item.id !== id),
+        ((data ?? []) as RecentArticle[])
+          .filter((item) => item.id !== id)
+          .slice(0, 6),
       );
     }
 
@@ -288,7 +376,7 @@ export default function NewsDetail() {
     };
   }, [id]);
 
-  // Close the image viewer with the Escape key.
+  // Close the image viewer with Escape.
   useEffect(() => {
     if (!activeImage) return;
 
@@ -305,32 +393,46 @@ export default function NewsDetail() {
     };
   }, [activeImage]);
 
-  async function handleShare() {
-    setShareMessage("");
+  // Share article to Facebook.
+  function shareToFacebook() {
+    const shareUrl = window.location.href;
 
+    const url = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(
+      shareUrl,
+    )}`;
+
+    window.open(url, "_blank", "width=600,height=500");
+
+    setShowShareOptions(false);
+  }
+
+  // Share article to Telegram.
+  function shareToTelegram() {
+    const shareUrl = window.location.href;
+    const shareTitle = article ? getTitle(article, isKhmer) : "News";
+
+    const url = `https://t.me/share/url?url=${encodeURIComponent(
+      shareUrl,
+    )}&text=${encodeURIComponent(shareTitle)}`;
+
+    window.open(url, "_blank", "width=600,height=500");
+
+    setShowShareOptions(false);
+  }
+
+  // Copy article link.
+  async function copyLink() {
     try {
-      if (navigator.share) {
-        await navigator.share({
-          title: article ? getTitle(article, isKhmer) : "News",
-          url: window.location.href,
-        });
-
-        return;
-      }
-
       await navigator.clipboard.writeText(window.location.href);
 
-      setShareMessage(isKhmer ? "បានចម្លងតំណរួចរាល់!" : "Article link copied!");
-    } catch (error) {
-      if (error instanceof Error && error.name === "AbortError") {
-        return;
-      }
+      setCopied(true);
 
-      setShareMessage(
-        isKhmer
-          ? "មិនអាចចែករំលែកបានទេ។ សូមចម្លងតំណពីកម្មវិធីរុករក។"
-          : "Unable to share. Please copy the link from your browser.",
-      );
+      window.setTimeout(() => {
+        setCopied(false);
+        setShowShareOptions(false);
+      }, 2000);
+    } catch (error) {
+      console.error("Unable to copy article link:", error);
     }
   }
 
@@ -352,7 +454,7 @@ export default function NewsDetail() {
     );
   }
 
-  // Error state.
+  // Error or article not found.
   if (loadError || !article) {
     return (
       <main className="flex min-h-[60vh] items-center justify-center bg-white px-4">
@@ -372,7 +474,7 @@ export default function NewsDetail() {
 
           <Link
             to="/news"
-            className="mt-6 inline-flex items-center gap-2 font-semibold text-blue-700 hover:text-blue-900"
+            className="mt-6 inline-flex items-center gap-2 font-semibold text-blue-700 transition hover:text-blue-900"
           >
             <ArrowLeft size={17} />
             {isKhmer ? "ត្រឡប់ទៅព័ត៌មាន" : "Back to News"}
@@ -384,7 +486,10 @@ export default function NewsDetail() {
 
   const title = getTitle(article, isKhmer);
   const summary = getSummary(article, isKhmer);
-  const content = getContent(article, isKhmer);
+
+  const rawContent = cleanArticleContent(getContent(article, isKhmer));
+  const content = sanitizeArticleContent(rawContent);
+  const showArticleContent = hasArticleContent(content);
 
   const articleDate = formatDate(
     article.published_at || article.created_at,
@@ -395,7 +500,7 @@ export default function NewsDetail() {
 
   return (
     <main className="min-h-screen bg-white text-slate-800">
-      {/* Breadcrumb */}
+      {/* Breadcrumb - KEEP THIS HORIZONTAL LINE */}
       <div className="border-b border-slate-100">
         <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
           <nav className="flex flex-wrap items-center gap-2 text-sm text-slate-500">
@@ -422,9 +527,10 @@ export default function NewsDetail() {
         <div className="grid grid-cols-1 items-start gap-12 lg:grid-cols-12 lg:gap-14">
           {/* Main article */}
           <article className="min-w-0 lg:col-span-8">
-            {/* Article heading */}
+            {/* Title and summary */}
             <header>
-              <div className="mb-5 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+              {/* Category, date and share dropdown */}
+              <div className="mb-5 flex flex-wrap items-center gap-x-4 gap-y-3 text-sm">
                 <span className="inline-flex items-center gap-2 font-semibold text-blue-700">
                   <Tag size={15} />
                   {categoryLabel}
@@ -436,6 +542,83 @@ export default function NewsDetail() {
                   <CalendarDays size={15} />
                   {articleDate}
                 </span>
+
+                {/* Share dropdown */}
+                <div
+                  ref={shareDropdownRef}
+                  className="relative flex items-center"
+                >
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setShowShareOptions((previous) => !previous)
+                    }
+                    aria-expanded={showShareOptions}
+                    aria-haspopup="true"
+                    className="inline-flex items-center gap-2 font-semibold text-slate-600 transition hover:text-blue-700"
+                  >
+                    <Share2 size={17} />
+                    {isKhmer ? "ចែករំលែកព័ត៌មាន" : "Share article"}
+                  </button>
+
+                  {/* Dropdown menu */}
+                  {showShareOptions && (
+                    <div className="absolute left-0 top-full z-50 mt-2 w-52 overflow-hidden rounded-xl border border-slate-200 bg-white p-2 shadow-xl">
+                      <p className="px-3 py-2 text-xs font-bold uppercase tracking-wider text-slate-400">
+                        {isKhmer
+                          ? "ចែករំលែកទំព័រនេះ"
+                          : "Share this page"}
+                      </p>
+
+                      {/* Facebook */}
+                      <button
+                        type="button"
+                        onClick={shareToFacebook}
+                        className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium text-slate-700 transition-colors duration-200 hover:bg-blue-50 hover:text-blue-700"
+                      >
+                        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 text-lg font-extrabold text-blue-700">
+                          f
+                        </span>
+                        Facebook
+                      </button>
+
+                      {/* Telegram */}
+                      <button
+                        type="button"
+                        onClick={shareToTelegram}
+                        className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium text-slate-700 transition-colors duration-200 hover:bg-sky-50 hover:text-sky-600"
+                      >
+                        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-sky-100 text-sky-600">
+                          <Send size={17} />
+                        </span>
+                        Telegram
+                      </button>
+
+                      {/* Copy link */}
+                      <button
+                        type="button"
+                        onClick={() => void copyLink()}
+                        className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium text-slate-700 transition-colors duration-200 hover:bg-slate-100"
+                      >
+                        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-600">
+                          {copied ? (
+                            <Check size={17} />
+                          ) : (
+                            <Copy size={17} />
+                          )}
+                        </span>
+
+                        {copied
+                          ? isKhmer
+                            ? "បានចម្លង!"
+                            : "Copied!"
+                          : isKhmer
+                            ? "ចម្លងតំណ"
+                            : "Copy link"}
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
 
               <h1 className="text-3xl font-extrabold leading-tight tracking-tight text-slate-950 sm:text-4xl lg:text-[42px]">
@@ -443,81 +626,90 @@ export default function NewsDetail() {
               </h1>
 
               {summary && (
-                <p className="mt-6 max-w-4xl text-lg leading-8 text-slate-600 sm:text-xl sm:leading-9">
+                <div className="mt-5 whitespace-pre-wrap break-words text-lg leading-8 text-slate-600">
                   {summary}
-                </p>
+                </div>
               )}
-
-              <div className="mt-6 flex flex-wrap items-center gap-4 border-b border-slate-200 pb-6">
-                <button
-                  type="button"
-                  onClick={() => void handleShare()}
-                  className="inline-flex items-center gap-2 text-sm font-semibold text-slate-600 transition hover:text-blue-700"
-                >
-                  <Share2 size={17} />
-                  {isKhmer ? "ចែករំលែកព័ត៌មាន" : "Share article"}
-                </button>
-
-                <a
-                  href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(window.location.href)}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  aria-label="Share on Facebook"
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-blue-50 text-sm font-bold text-blue-700 transition hover:bg-blue-100"
-                >
-                  f
-                </a>
-
-                {shareMessage && (
-                  <span className="text-xs text-green-700">{shareMessage}</span>
-                )}
-              </div>
             </header>
 
-            {/* ALL photos in one gallery.
-                No separate cover photo, no gallery heading, no image count.
-                Original image proportions are preserved. */}
-            {images.length > 0 && (
-              <div className="mt-8 space-y-6 sm:space-y-8">
-                {images.map((image, index) => (
-                  <figure key={image.id} className="min-w-0">
-                    <button
-                      type="button"
-                      onClick={() => setActiveImage(image.image_url)}
-                      className="block w-full cursor-zoom-in text-left"
-                      aria-label={
-                        isKhmer
-                          ? `មើលរូបភាពទី ${index + 1}`
-                          : `View image ${index + 1}`
-                      }
-                    >
-                      <img
-                        src={image.image_url}
-                        alt={image.alt_text || title}
-                        loading={index === 0 ? "eager" : "lazy"}
-                        className="block h-auto w-full object-contain"
-                      />
-                    </button>
-                  </figure>
-                ))}
-              </div>
+            {/* Featured image */}
+            {article.image_url && (
+              <figure className="mt-8">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (article.image_url) {
+                      setActiveImage(article.image_url);
+                    }
+                  }}
+                  className="block w-full cursor-zoom-in overflow-hidden bg-slate-50"
+                  aria-label={isKhmer ? "មើលរូបភាពធំ" : "View featured image"}
+                >
+                  <img
+                    src={article.image_url}
+                    alt={title}
+                    loading="eager"
+                    fetchPriority="high"
+                    className="block h-auto max-h-[650px] w-full object-contain"
+                  />
+                </button>
+              </figure>
             )}
 
-            {/* Article content: hidden if null or empty. */}
-            {content && (
+            {/* Formatted article content - no divider */}
+            {showArticleContent && (
               <section className="mt-10">
-                <h2 className="mb-5 border-b border-slate-200 pb-3 text-xl font-bold text-slate-900">
+                <h2 className="mb-5 text-xl font-bold text-slate-900">
                   {isKhmer ? "ខ្លឹមសារព័ត៌មាន" : "Article"}
                 </h2>
 
-                <div className="whitespace-pre-line break-words text-base leading-8 text-slate-700 sm:text-[17px] sm:leading-9">
-                  {content}
+                <div
+                  className="whitespace-pre-wrap break-words text-base leading-8 text-slate-700 sm:text-[17px]"
+                  lang={isKhmer ? "kh" : "en"}
+                  dangerouslySetInnerHTML={{ __html: content }}
+                />
+              </section>
+            )}
+
+            {/* Photo Gallery */}
+            {images.length > 0 && (
+              <section
+                className={
+                  article.image_url || hasArticleContent(content)
+                    ? "mt-8"
+                    : "mt-3"
+                }
+              >
+                
+
+                <div className="grid grid-cols-3 gap-2 sm:gap-4">
+                  {images.map((image, index) => (
+                    <figure key={image.id} className="min-w-0">
+                      <button
+                        type="button"
+                        onClick={() => setActiveImage(image.image_url)}
+                        className="group block aspect-square w-full cursor-zoom-in overflow-hidden rounded-lg bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-600"
+                        aria-label={
+                          isKhmer
+                            ? `មើលរូបភាពទី ${index + 1}`
+                            : `View gallery image ${index + 1}`
+                        }
+                      >
+                        <img
+                          src={image.image_url}
+                          alt={image.alt_text || `${title} - ${index + 1}`}
+                          loading="lazy"
+                          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                        />
+                      </button>
+                    </figure>
+                  ))}
                 </div>
               </section>
             )}
 
-            {/* Back to news */}
-            <div className="mt-12 border-t border-slate-200 pt-6">
+            {/* Back to news - no divider */}
+            <div className="mt-12 pt-6">
               <Link
                 to="/news"
                 className="inline-flex items-center gap-2 text-sm font-semibold text-blue-700 transition hover:text-blue-900"
@@ -530,8 +722,8 @@ export default function NewsDetail() {
 
           {/* Sidebar */}
           <aside className="min-w-0 lg:col-span-4">
-            {/* Academy information */}
-            <section className="border-b border-slate-200 pb-7">
+            {/* Academy information - no divider */}
+            <section className="pb-7">
               <div className="flex items-start gap-3">
                 <Shield size={26} className="mt-1 shrink-0 text-blue-700" />
 
@@ -563,14 +755,14 @@ export default function NewsDetail() {
               </Link>
             </section>
 
-            {/* Recent news */}
+            {/* Recent news - no dividers between articles */}
             <section className="mt-8">
-              <h2 className="mb-5 border-b border-slate-200 pb-3 text-lg font-bold text-slate-900">
+              <h2 className="mb-5 text-lg font-bold text-slate-900">
                 {isKhmer ? "ព័ត៌មានថ្មីៗ" : "Recent News"}
               </h2>
 
               {recentNews.length > 0 ? (
-                <div className="divide-y divide-slate-100">
+                <div>
                   {recentNews.map((item) => {
                     const recentTitle = isKhmer
                       ? item.title_kh?.trim() || item.title_en?.trim() || ""
@@ -591,7 +783,10 @@ export default function NewsDetail() {
                               className="h-full w-full object-contain"
                             />
                           ) : (
-                            <ImageIcon size={23} className="text-slate-400" />
+                            <ImageIcon
+                              size={23}
+                              className="text-slate-400"
+                            />
                           )}
                         </div>
 
@@ -633,8 +828,8 @@ export default function NewsDetail() {
               </Link>
             </section>
 
-            {/* Quick links */}
-            <section className="mt-10 border-t border-slate-200 pt-7">
+            {/* Quick links - no divider */}
+            <section className="mt-10 pt-7">
               <h2 className="mb-4 text-lg font-bold text-slate-900">
                 {isKhmer ? "តំណភ្ជាប់រហ័ស" : "Quick Links"}
               </h2>
@@ -698,3 +893,4 @@ export default function NewsDetail() {
     </main>
   );
 }
+

@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -16,43 +17,67 @@ interface NewsArticle {
 export default function Hero() {
   const { i18n } = useTranslation();
 
-  const isKhmer = i18n.language.toLowerCase().startsWith("kh");
+  const language = (
+    i18n.resolvedLanguage ||
+    i18n.language ||
+    "en"
+  ).toLowerCase();
+
+  const isKhmer = language.startsWith("kh") || language.startsWith("km");
 
   const [featuredNews, setFeaturedNews] = useState<NewsArticle[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
   const [paused, setPaused] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // Load up to 3 pinned and published news articles from Supabase.
+  // Fetch pinned and published news, and measure request duration.
   useEffect(() => {
     let isMounted = true;
 
     async function loadFeaturedNews() {
-      setLoading(true);
+      const startTime = performance.now();
 
-      const { data, error } = await supabase
-        .from("news")
-        .select("id, title_kh, title_en, image_url, published_at, created_at")
-        .eq("status", "published")
-        .eq("is_pinned", true)
-        .order("published_at", {
-          ascending: false,
-          nullsFirst: false,
-        })
-        .order("created_at", { ascending: false })
-        .limit(3);
+      try {
+        const { data, error } = await supabase
+          .from("news")
+          .select(
+            "id, title_kh, title_en, image_url, published_at, created_at",
+          )
+          .eq("status", "published")
+          .eq("is_pinned", true)
+          .order("published_at", {
+            ascending: false,
+            nullsFirst: false,
+          })
+          .order("created_at", { ascending: false })
+          .limit(3);
 
-      if (!isMounted) return;
+        const elapsed = performance.now() - startTime;
 
-      if (error) {
-        console.error("Failed to load featured news:", error.message);
+        console.log(
+          `[Featured News] Database request: ${elapsed.toFixed(0)} ms`,
+        );
+
+        if (!isMounted) return;
+
+        if (error) {
+          console.error("Failed to load featured news:", error.message);
+          setFeaturedNews([]);
+        } else {
+          setFeaturedNews(data ?? []);
+        }
+
+        setActiveIndex(0);
+      } catch (error) {
+        if (!isMounted) return;
+
+        console.error("Unexpected error loading featured news:", error);
         setFeaturedNews([]);
-      } else {
-        setFeaturedNews(data ?? []);
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
       }
-
-      setActiveIndex(0);
-      setLoading(false);
     }
 
     loadFeaturedNews();
@@ -96,11 +121,15 @@ export default function Hero() {
 
     if (!date) return "";
 
-    return new Intl.DateTimeFormat(isKhmer ? "kh-KH" : "en-GB", {
+    const parsedDate = new Date(date);
+
+    if (Number.isNaN(parsedDate.getTime())) return "";
+
+    return new Intl.DateTimeFormat(isKhmer ? "km-KH" : "en-GB", {
       day: "numeric",
       month: "long",
       year: "numeric",
-    }).format(new Date(date));
+    }).format(parsedDate);
   }
 
   if (loading) {
@@ -187,7 +216,10 @@ export default function Hero() {
                   <img
                     src={article.image_url}
                     alt={getTitle(article)}
+                    width={1200}
+                    height={680}
                     loading={index === 0 ? "eager" : "lazy"}
+                    decoding="async"
                     className="absolute inset-0 h-full w-full object-cover object-center"
                   />
                 ) : (
@@ -277,7 +309,10 @@ export default function Hero() {
                   <img
                     src={article.image_url}
                     alt=""
+                    width={96}
+                    height={64}
                     loading="lazy"
+                    decoding="async"
                     className="h-16 w-24 shrink-0 rounded-lg object-cover"
                   />
                 ) : (
@@ -295,3 +330,4 @@ export default function Hero() {
     </section>
   );
 }
+

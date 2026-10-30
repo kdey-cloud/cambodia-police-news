@@ -138,7 +138,6 @@ export default function Footer() {
               { label: t("institution"), href: "/institution/background" },
               { label: t("information"), href: "/information" },
               { label: t("contact"), href: "/contact" },
-              { label: t("news"), href: "/" },
               { label: t("search"), href: "/search" },
             ].map((link) => (
               <li key={link.href}>

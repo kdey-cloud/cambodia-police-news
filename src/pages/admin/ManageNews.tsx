@@ -1,673 +1,883 @@
+
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import {
-  Plus,
-  Search,
-  Pencil,
-  Trash2,
-  Languages,
-  Newspaper,
-  RefreshCw,
   AlertCircle,
+  CheckCircle2,
   Eye,
-  ExternalLink,
+  LoaderCircle,
   Pin,
   PinOff,
+  Plus,
+  RefreshCw,
+  Search,
+  Trash2,
+  Power,
+  Pencil,
 } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 
 interface NewsArticle {
-  id: string | number;
+  id: string;
   title_kh: string | null;
   title_en: string | null;
   category: string | null;
-  status: string;
+  status: string | null;
   published_at: string | null;
-  created_at: string;
-  is_pinned: boolean;
+  created_at: string | null;
+  is_pinned: boolean | null;
 }
 
-type Language = "en" | "kh";
+type StatusFilter = "all" | "published" | "draft";
+
+const NEWS_SELECT =
+  "id, title_kh, title_en, category, status, published_at, created_at, is_pinned";
+
+interface SupabaseErrorDetails {
+  message: string;
+  code?: string;
+  details?: string | null;
+  hint?: string | null;
+}
+
+function getErrorMessage(error: unknown): string {
+  if (typeof error === "object" && error !== null && "message" in error) {
+    const supabaseError = error as SupabaseErrorDetails;
+
+    return [
+      supabaseError.message,
+      supabaseError.code ? `Code: ${supabaseError.code}` : null,
+      supabaseError.details ? `Details: ${supabaseError.details}` : null,
+      supabaseError.hint ? `Hint: ${supabaseError.hint}` : null,
+    ]
+      .filter(Boolean)
+      .join(" | ");
+  }
+
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return "An unexpected error occurred.";
+}
 
 export default function ManageNews() {
+  const navigate = useNavigate();
+
   const [articles, setArticles] = useState<NewsArticle[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [deletingId, setDeletingId] = useState<string | number | null>(null);
-  const [pinningId, setPinningId] = useState<string | number | null>(null);
-  const [error, setError] = useState("");
-
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("All");
-  const [categoryFilter, setCategoryFilter] = useState("All");
-  const [language, setLanguage] = useState<Language>("en");
+  const [statusFilter, setStatusFilter] =
+    useState<StatusFilter>("all");
+  const [errorMessage, setErrorMessage] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
+  const [processingId, setProcessingId] = useState<string | null>(null);
 
-  const pinnedCount = articles.filter(
-    (article) =>
-      article.is_pinned && article.status.toLowerCase() === "published",
-  ).length;
-
-  // Load articles from Supabase.
-  const loadArticles = useCallback(async (initial = false) => {
-    if (initial) {
-      setLoading(true);
-    } else {
-      setRefreshing(true);
-    }
-
-    setError("");
-
-    try {
-      const { data, error: queryError } = await supabase
-        .from("news")
-        .select(
-          "id, title_kh, title_en, category, status, published_at, created_at, is_pinned",
-        )
-        .order("created_at", { ascending: false });
-
-      if (queryError) throw queryError;
-
-      setArticles((data ?? []) as NewsArticle[]);
-    } catch (err) {
-      console.error("Failed to load news:", err);
-
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Unable to load articles from Supabase.",
-      );
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
+  const showError = useCallback((message: string) => {
+    setErrorMessage(message);
+    setSuccessMessage("");
   }, []);
 
-  // Initial load, live updates, and periodic refresh.
+  const showSuccess = useCallback((message: string) => {
+    setSuccessMessage(message);
+    setErrorMessage("");
+  }, []);
+
+  // Automatically clear success messages.
   useEffect(() => {
-    void loadArticles(true);
+    if (!successMessage) return;
 
-    const channel = supabase
-      .channel("manage-news-changes")
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "news",
-        },
-        () => {
-          void loadArticles();
-        },
-      )
-      .subscribe();
+    const timeout = window.setTimeout(() => {
+      setSuccessMessage("");
+    }, 3500);
 
-    const interval = window.setInterval(() => {
-      if (document.visibilityState === "visible") {
-        void loadArticles();
+    return () => window.clearTimeout(timeout);
+  }, [successMessage]);
+
+  // Load ALL news, including published articles and drafts.
+  // IMPORTANT: Do not filter by status in this query.
+  const loadNews = useCallback(
+    async (showLoader = true) => {
+      if (showLoader) {
+        setLoading(true);
+      } else {
+        setRefreshing(true);
       }
-    }, 30000);
+
+      try {
+        const { data, error } = await supabase
+          .from("news")
+          .select(NEWS_SELECT)
+          .order("created_at", { ascending: false });
+
+        if (error) throw error;
+
+        setArticles((data ?? []) as unknown as NewsArticle[]);
+      } catch (error: unknown) {
+        console.error("[ManageNews] Failed to load news:", error);
+
+        showError(
+          `Unable to load news: ${getErrorMessage(error)}`,
+        );
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    },
+    [showError],
+  );
+
+  // Load on page entry and refresh when the page becomes visible.
+  useEffect(() => {
+    void loadNews();
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") {
-        void loadArticles();
+        void loadNews(false);
       }
     };
 
-    document.addEventListener("visibilitychange", handleVisibilityChange);
+    document.addEventListener(
+      "visibilitychange",
+      handleVisibilityChange,
+    );
+
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === "visible") {
+        void loadNews(false);
+      }
+    }, 30000);
 
     return () => {
-      window.clearInterval(interval);
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-      void supabase.removeChannel(channel);
-    };
-  }, [loadArticles]);
-
-  // Get the title in the selected language.
-  function getTitle(article: NewsArticle): string {
-    if (language === "kh") {
-      return (
-        article.title_kh?.trim() || article.title_en?.trim() || "គ្មានចំណងជើង"
+      document.removeEventListener(
+        "visibilitychange",
+        handleVisibilityChange,
       );
-    }
 
-    return (
-      article.title_en?.trim() || article.title_kh?.trim() || "Untitled article"
-    );
-  }
+      window.clearInterval(interval);
+    };
+  }, [loadNews]);
 
-  // Format dates.
-  function formatDate(date: string | null): string {
-    if (!date) return "Not published";
-
-    const parsedDate = new Date(date);
-
-    if (Number.isNaN(parsedDate.getTime())) {
-      return "Not published";
-    }
-
-    return new Intl.DateTimeFormat(language === "kh" ? "kh-KH" : "en-GB", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    }).format(parsedDate);
-  }
-
-  // Get available categories.
-  const categories = useMemo(() => {
-    return Array.from(
-      new Set(
-        articles
-          .map((article) => article.category?.trim())
-          .filter((category): category is string => Boolean(category)),
-      ),
-    ).sort();
-  }, [articles]);
-
-  // Search and filter articles.
+  // Search and filter news locally.
   const filteredArticles = useMemo(() => {
-    const query = search.trim().toLowerCase();
+    const searchTerm = search.trim().toLowerCase();
 
     return articles.filter((article) => {
-      const titleEn = article.title_en ?? "";
-      const titlekh = article.title_kh ?? "";
-      const category = article.category ?? "";
-
       const matchesSearch =
-        !query ||
-        titleEn.toLowerCase().includes(query) ||
-        titlekh.toLowerCase().includes(query) ||
-        category.toLowerCase().includes(query) ||
-        String(article.id).toLowerCase().includes(query);
+        !searchTerm ||
+        (article.title_kh ?? "").toLowerCase().includes(searchTerm) ||
+        (article.title_en ?? "").toLowerCase().includes(searchTerm) ||
+        (article.category ?? "").toLowerCase().includes(searchTerm);
 
       const matchesStatus =
-        statusFilter === "All" ||
-        article.status.toLowerCase() === statusFilter.toLowerCase();
+        statusFilter === "all" ||
+        article.status === statusFilter;
 
-      const matchesCategory =
-        categoryFilter === "All" || category === categoryFilter;
-
-      return matchesSearch && matchesStatus && matchesCategory;
+      return matchesSearch && matchesStatus;
     });
-  }, [articles, search, statusFilter, categoryFilter]);
+  }, [articles, search, statusFilter]);
 
-  // Pin or unpin a published article.
-  async function togglePin(article: NewsArticle) {
-    if (pinningId !== null) return;
+  // Publish or deactivate an article.
+  const toggleStatus = async (article: NewsArticle) => {
+    if (processingId) return;
 
-    const currentlyPinned = article.is_pinned;
+    const newStatus =
+      article.status === "published" ? "draft" : "published";
 
-    if (article.status.toLowerCase() !== "published") {
-      setError("Only published articles can be pinned to the Hero.");
-      return;
-    }
+    const action =
+      newStatus === "draft" ? "deactivate" : "publish";
 
-    if (!currentlyPinned && pinnedCount >= 3) {
-      setError(
-        "You can pin a maximum of 3 published news articles. Unpin one first.",
-      );
-      return;
-    }
-
-    setPinningId(article.id);
-    setError("");
+    setProcessingId(article.id);
+    setErrorMessage("");
+    setSuccessMessage("");
 
     try {
-      const { error: updateError } = await supabase
-        .from("news")
-        .update({ is_pinned: !currentlyPinned })
-        .eq("id", article.id);
+      // Confirm the current user.
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
+
+      if (userError) throw userError;
+
+      if (!user) {
+        throw new Error(
+          "Your session has expired. Please sign in again.",
+        );
+      }
+
+      // Verify admin access.
+      const { data: isAdmin, error: adminError } =
+        await supabase.rpc("is_admin");
+
+      if (adminError) throw adminError;
+
+      if (isAdmin !== true) {
+        throw new Error(
+          "Your account is not authorized to manage news.",
+        );
+      }
+
+      // Update status using the secure RPC function.
+      const { data: updateResult, error: updateError } =
+        await supabase.rpc("admin_update_news_status", {
+          p_news_id: article.id,
+          p_new_status: newStatus,
+        });
 
       if (updateError) throw updateError;
 
-      await loadArticles();
-    } catch (err) {
-      console.error("Failed to update pinned news:", err);
+      if (updateResult !== true) {
+        throw new Error(
+          "Supabase did not confirm the news status update.",
+        );
+      }
 
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Unable to update the pinned article.",
+      // Update the status immediately without removing the article.
+      setArticles((previous) =>
+        previous.map((item) =>
+          item.id === article.id
+            ? { ...item, status: newStatus }
+            : item,
+        ),
+      );
+
+      showSuccess(
+        newStatus === "draft"
+          ? "Article deactivated. It remains available in Manage News."
+          : "Article published successfully.",
+      );
+
+      // Refresh data from Supabase.
+      await loadNews(false);
+    } catch (error: unknown) {
+      console.error(
+        `[ManageNews] Unable to ${action} article:`,
+        error,
+      );
+
+      showError(
+        `Unable to ${action} article: ${getErrorMessage(error)}`,
       );
     } finally {
-      setPinningId(null);
+      setProcessingId(null);
     }
-  }
+  };
 
-  // Delete an article from Supabase.
-  async function deleteArticle(id: string | number) {
+  // Pin or unpin an article.
+  const togglePinned = async (article: NewsArticle) => {
+    if (processingId) return;
+
+    const newPinnedStatus = !article.is_pinned;
+
+    setProcessingId(article.id);
+    setErrorMessage("");
+    setSuccessMessage("");
+
+    try {
+      const { data, error } = await supabase
+        .from("news")
+        .update({ is_pinned: newPinnedStatus })
+        .eq("id", article.id)
+        .select("id");
+
+      if (error) throw error;
+
+      if (!data || data.length === 0) {
+        throw new Error(
+          "No article was updated. Check your update permissions.",
+        );
+      }
+
+      setArticles((previous) =>
+        previous.map((item) =>
+          item.id === article.id
+            ? { ...item, is_pinned: newPinnedStatus }
+            : item,
+        ),
+      );
+
+      showSuccess(
+        newPinnedStatus
+          ? "Article pinned successfully."
+          : "Article unpinned successfully.",
+      );
+
+      await loadNews(false);
+    } catch (error: unknown) {
+      console.error("[ManageNews] Pin update failed:", error);
+
+      showError(
+        `Unable to update pinned status: ${getErrorMessage(error)}`,
+      );
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  // Delete an article permanently.
+  const deleteArticle = async (article: NewsArticle) => {
+    if (processingId) return;
+
+    const title =
+      article.title_en ||
+      article.title_kh ||
+      "this article";
+
     const confirmed = window.confirm(
-      "Are you sure you want to permanently delete this article? This action cannot be undone.",
+      `Are you sure you want to delete "${title}"? This action cannot be undone.`,
     );
 
     if (!confirmed) return;
 
-    setDeletingId(id);
-    setError("");
+    setProcessingId(article.id);
+    setErrorMessage("");
+    setSuccessMessage("");
 
     try {
-      const { error: deleteError } = await supabase
+      const { error } = await supabase
         .from("news")
         .delete()
-        .eq("id", id);
+        .eq("id", article.id);
 
-      if (deleteError) throw deleteError;
+      if (error) throw error;
 
-      setArticles((current) => current.filter((article) => article.id !== id));
-    } catch (err) {
-      console.error("Failed to delete article:", err);
+      setArticles((previous) =>
+        previous.filter((item) => item.id !== article.id),
+      );
 
-      setError(
-        err instanceof Error ? err.message : "Unable to delete the article.",
+      showSuccess("Article deleted successfully.");
+    } catch (error: unknown) {
+      console.error("[ManageNews] Delete failed:", error);
+
+      showError(
+        `Unable to delete article: ${getErrorMessage(error)}`,
       );
     } finally {
-      setDeletingId(null);
+      setProcessingId(null);
     }
-  }
+  };
+
+  const formatDate = (date: string | null) => {
+    if (!date) return "—";
+
+    const parsedDate = new Date(date);
+
+    if (Number.isNaN(parsedDate.getTime())) {
+      return "—";
+    }
+
+    return parsedDate.toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+  };
+
+  const publishedCount = articles.filter(
+    (article) => article.status === "published",
+  ).length;
+
+  const draftCount = articles.filter(
+    (article) => article.status === "draft",
+  ).length;
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6">
-      {/* Page heading */}
-      <div className="flex flex-col justify-between gap-4 border-b border-slate-200 pb-5 sm:flex-row sm:items-center">
-        <div>
-          <p className="text-sm font-medium text-blue-600">WEBSITE CONTENT</p>
+    <div className="min-h-screen bg-slate-50 p-4 sm:p-6 lg:p-8">
+      <div className="mx-auto max-w-7xl">
+        {/* Heading */}
+        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">
+              Manage News
+            </h1>
 
-          <h1 className="mt-1 text-2xl font-bold text-slate-900">
-            Articles &amp; News
-          </h1>
+            <p className="mt-2 text-sm text-slate-500">
+              Create, publish, deactivate, and manage news articles.
+            </p>
+          </div>
 
-          <p className="mt-2 text-sm text-slate-500">
-            Manage Khmer and English news articles for your public website.
-          </p>
-        </div>
-
-        <div className="flex flex-wrap gap-3">
-          <button
-            type="button"
-            onClick={() => void loadArticles()}
-            disabled={refreshing || loading}
-            className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            <RefreshCw size={17} className={refreshing ? "animate-spin" : ""} />
-            Refresh
-          </button>
-
-          <Link
-            to="/admin/news/new"
-            className="inline-flex items-center justify-center gap-2 rounded-lg bg-sky-500 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-600"
-          >
-            <Plus size={18} />
-            New Article
-          </Link>
-        </div>
-      </div>
-
-      {/* Error message */}
-      {error && (
-        <div
-          role="alert"
-          className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"
-        >
-          <AlertCircle size={20} className="mt-0.5 shrink-0" />
-
-          <div className="min-w-0">
-            <p className="font-semibold">Something went wrong</p>
-            <p className="mt-1 break-words">{error}</p>
+          <div className="flex flex-wrap gap-3">
+            <button
+              type="button"
+              onClick={() => void loadNews(false)}
+              disabled={refreshing || loading}
+              className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <RefreshCw
+                size={16}
+                className={refreshing ? "animate-spin" : ""}
+              />
+              Refresh
+            </button>
 
             <button
               type="button"
-              onClick={() => void loadArticles(true)}
-              className="mt-2 font-semibold underline"
+              onClick={() => navigate("/admin/news/create")}
+              className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-800"
             >
-              Try again
+              <Plus size={17} />
+              Create News
             </button>
           </div>
         </div>
-      )}
 
-      {/* Hero pin count */}
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-blue-200 bg-blue-50 p-4">
-        <div className="flex items-center gap-3">
-          <div className="rounded-lg bg-white p-2 text-blue-700">
-            <Pin size={20} />
+        {/* Error notification */}
+        {errorMessage && (
+          <div
+            role="alert"
+            className="mb-5 flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800"
+          >
+            <AlertCircle
+              size={20}
+              className="mt-0.5 shrink-0"
+            />
+
+            <div className="min-w-0">
+              <p className="font-semibold">
+                Something went wrong
+              </p>
+
+              <p className="mt-1 break-words">
+                {errorMessage}
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setErrorMessage("")}
+              className="ml-auto shrink-0 text-red-700 hover:text-red-900"
+              aria-label="Dismiss error"
+            >
+              ×
+            </button>
+          </div>
+        )}
+
+        {/* Success notification */}
+        {successMessage && (
+          <div
+            role="status"
+            className="mb-5 flex items-center gap-3 rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-800"
+          >
+            <CheckCircle2 size={20} />
+            {successMessage}
+          </div>
+        )}
+
+        {/* Summary cards */}
+        <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <p className="text-sm text-slate-500">Total Articles</p>
+            <p className="mt-2 text-3xl font-bold text-slate-900">
+              {articles.length}
+            </p>
           </div>
 
-          <div>
-            <p className="font-semibold text-blue-950">Hero Carousel</p>
-            <p className="text-sm text-blue-800">
-              Choose up to 3 published articles for the homepage.
+          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <p className="text-sm text-slate-500">Published</p>
+            <p className="mt-2 text-3xl font-bold text-green-700">
+              {publishedCount}
+            </p>
+          </div>
+
+          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <p className="text-sm text-slate-500">Drafts / Deactivated</p>
+            <p className="mt-2 text-3xl font-bold text-amber-600">
+              {draftCount}
             </p>
           </div>
         </div>
 
-        <span
-          className={`rounded-full px-4 py-2 text-sm font-bold ${
-            pinnedCount === 3
-              ? "bg-emerald-100 text-emerald-800"
-              : "bg-white text-blue-800"
-          }`}
-        >
-          {pinnedCount}/3 pinned
-        </span>
-      </div>
+        {/* Search and status filter */}
+        <div className="mb-5 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="flex flex-col gap-3 md:flex-row">
+            <div className="relative flex-1">
+              <Search
+                size={18}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+              />
 
-      {/* Language selector */}
-      <div className="flex flex-wrap items-center gap-3">
-        <Languages size={19} className="text-slate-500" />
+              <input
+                type="search"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search Khmer title, English title, or category..."
+                className="w-full rounded-lg border border-slate-200 py-2.5 pl-10 pr-4 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              />
+            </div>
 
-        <span className="text-sm font-medium text-slate-700">
-          Preview titles in:
-        </span>
-
-        <div className="inline-flex rounded-lg border border-slate-200 bg-white p-1">
-          <button
-            type="button"
-            onClick={() => setLanguage("kh")}
-            className={`rounded-md px-3 py-1.5 text-sm font-medium ${
-              language === "kh"
-                ? "bg-blue-600 text-white"
-                : "text-slate-600 hover:bg-slate-100"
-            }`}
-          >
-            Khmer
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setLanguage("en")}
-            className={`rounded-md px-3 py-1.5 text-sm font-medium ${
-              language === "en"
-                ? "bg-blue-600 text-white"
-                : "text-slate-600 hover:bg-slate-100"
-            }`}
-          >
-            English
-          </button>
-        </div>
-      </div>
-
-      {/* Search and filters */}
-      <section className="grid gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm md:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_200px_200px]">
-        <div>
-          <label
-            htmlFor="news-search"
-            className="mb-2 block text-sm font-semibold text-slate-700"
-          >
-            Search
-          </label>
-
-          <div className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-100">
-            <Search size={18} className="shrink-0 text-slate-400" />
-
-            <input
-              id="news-search"
-              type="search"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search by title or ID..."
-              className="min-w-0 flex-1 py-2.5 text-sm outline-none"
-            />
+            <select
+              value={statusFilter}
+              onChange={(event) =>
+                setStatusFilter(event.target.value as StatusFilter)
+              }
+              className="rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-blue-500"
+              aria-label="Filter by status"
+            >
+              <option value="all">All statuses</option>
+              <option value="published">Published</option>
+              <option value="draft">Drafts / Deactivated</option>
+            </select>
           </div>
         </div>
 
-        <div>
-          <label
-            htmlFor="status-filter"
-            className="mb-2 block text-sm font-semibold text-slate-700"
-          >
-            Status
-          </label>
+        {/* Articles */}
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+          {loading ? (
+            <div className="flex min-h-64 flex-col items-center justify-center gap-3 p-8">
+              <LoaderCircle
+                size={32}
+                className="animate-spin text-blue-700"
+              />
 
-          <select
-            id="status-filter"
-            value={statusFilter}
-            onChange={(event) => setStatusFilter(event.target.value)}
-            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-blue-500"
-          >
-            <option value="All">All Statuses</option>
-            <option value="published">Published</option>
-            <option value="draft">Draft</option>
-          </select>
-        </div>
+              <p className="text-sm text-slate-500">
+                Loading news articles...
+              </p>
+            </div>
+          ) : filteredArticles.length === 0 ? (
+            <div className="flex min-h-64 flex-col items-center justify-center p-8 text-center">
+              <Search
+                size={36}
+                className="mb-3 text-slate-300"
+              />
 
-        <div>
-          <label
-            htmlFor="category-filter"
-            className="mb-2 block text-sm font-semibold text-slate-700"
-          >
-            Category
-          </label>
+              <h2 className="font-semibold text-slate-800">
+                No articles found
+              </h2>
 
-          <select
-            id="category-filter"
-            value={categoryFilter}
-            onChange={(event) => setCategoryFilter(event.target.value)}
-            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-blue-500"
-          >
-            <option value="All">All Categories</option>
+              <p className="mt-1 text-sm text-slate-500">
+                Try another search term or change the status filter.
+              </p>
+            </div>
+          ) : (
+            <>
+              {/* Desktop table */}
+              <div className="hidden overflow-x-auto md:block">
+                <table className="w-full text-left">
+                  <thead className="border-b border-slate-200 bg-slate-50">
+                    <tr>
+                      <th className="px-5 py-4 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Article
+                      </th>
+                      <th className="px-5 py-4 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Category
+                      </th>
+                      <th className="px-5 py-4 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Status
+                      </th>
+                      <th className="px-5 py-4 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Date
+                      </th>
+                      <th className="px-5 py-4 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
 
-            {categories.map((category) => (
-              <option key={category} value={category}>
-                {category}
-              </option>
-            ))}
-          </select>
-        </div>
-      </section>
+                  <tbody className="divide-y divide-slate-100">
+                    {filteredArticles.map((article) => {
+                      const isProcessing =
+                        processingId === article.id;
 
-      {/* Results count */}
-      <p className="text-sm text-slate-500">
-        {loading
-          ? "Loading articles..."
-          : `Showing ${filteredArticles.length} of ${articles.length} articles`}
-      </p>
-
-      {/* Articles table */}
-      <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[1150px] text-left text-sm">
-            <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wider text-slate-500">
-              <tr>
-                <th className="px-5 py-4">Title</th>
-                <th className="px-5 py-4">Category</th>
-                <th className="px-5 py-4">Status</th>
-                <th className="px-5 py-4">Publication Date</th>
-                <th className="px-5 py-4">Hero</th>
-                <th className="px-5 py-4">Views</th>
-                <th className="px-5 py-4 text-right">Actions</th>
-              </tr>
-            </thead>
-
-            <tbody className="divide-y divide-slate-100">
-              {loading ? (
-                <tr>
-                  <td
-                    colSpan={7}
-                    className="px-5 py-16 text-center text-slate-500"
-                  >
-                    Loading articles from Supabase...
-                  </td>
-                </tr>
-              ) : (
-                <>
-                  {filteredArticles.map((article) => {
-                    const isPublished =
-                      article.status.toLowerCase() === "published";
-
-                    const isDraft = article.status.toLowerCase() === "draft";
-
-                    return (
-                      <tr
-                        key={article.id}
-                        className="transition hover:bg-slate-50"
-                      >
-                        <td className="max-w-xs px-5 py-5">
-                          <div className="flex items-start gap-3">
-                            <div className="mt-1 rounded-lg bg-blue-50 p-2 text-blue-600">
-                              <Newspaper size={18} />
-                            </div>
-
-                            <div className="min-w-0">
-                              <p className="font-semibold text-slate-800">
-                                {getTitle(article)}
-                              </p>
-
-                              <p className="mt-1 break-all text-xs text-slate-400">
-                                {language === "kh" ? "Khmer" : "English"} · ID{" "}
-                                {article.id}
-                              </p>
-                            </div>
-                          </div>
-                        </td>
-
-                        <td className="px-5 py-5">
-                          <span className="rounded-full bg-sky-50 px-3 py-1.5 text-xs font-medium text-sky-700">
-                            {article.category || "Uncategorized"}
-                          </span>
-                        </td>
-
-                        <td className="px-5 py-5">
-                          <span
-                            className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
-                              isPublished
-                                ? "bg-emerald-100 text-emerald-700"
-                                : isDraft
-                                  ? "bg-amber-100 text-amber-700"
-                                  : "bg-slate-100 text-slate-700"
-                            }`}
-                          >
-                            {isPublished
-                              ? "Published"
-                              : isDraft
-                                ? "Draft"
-                                : article.status}
-                          </span>
-                        </td>
-
-                        <td className="whitespace-nowrap px-5 py-5 text-slate-600">
-                          {isPublished
-                            ? formatDate(article.published_at)
-                            : "Not published"}
-                        </td>
-
-                        <td className="px-5 py-5">
-                          {article.is_pinned && isPublished ? (
-                            <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1.5 text-xs font-semibold text-amber-800">
-                              <Pin size={13} />
-                              Pinned
-                            </span>
-                          ) : (
-                            <span className="text-xs text-slate-400">
-                              Not pinned
-                            </span>
-                          )}
-                        </td>
-
-                        <td className="px-5 py-5 text-slate-600">—</td>
-
-                        <td className="px-5 py-5">
-                          <div className="flex items-center justify-end gap-2">
-                            <button
-                              type="button"
-                              onClick={() => void togglePin(article)}
-                              disabled={
-                                pinningId !== null ||
-                                (!article.is_pinned && pinnedCount >= 3) ||
-                                !isPublished
-                              }
-                              title={
-                                !isPublished
-                                  ? "Only published articles can be pinned"
-                                  : article.is_pinned
-                                    ? "Remove from Hero"
-                                    : pinnedCount >= 3
-                                      ? "Unpin another article first"
-                                      : "Pin to Hero"
-                              }
-                              className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${
-                                article.is_pinned
-                                  ? "border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100"
-                                  : "border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100"
-                              }`}
-                            >
-                              {article.is_pinned ? (
-                                <PinOff size={14} />
-                              ) : (
-                                <Pin size={14} />
+                      return (
+                        <tr
+                          key={article.id}
+                          className="transition hover:bg-slate-50"
+                        >
+                          <td className="max-w-sm px-5 py-4">
+                            <div className="flex items-start gap-2">
+                              {article.is_pinned && (
+                                <Pin
+                                  size={15}
+                                  className="mt-1 shrink-0 text-amber-500"
+                                />
                               )}
 
-                              {pinningId === article.id
-                                ? "Saving..."
-                                : article.is_pinned
-                                  ? "Unpin"
-                                  : "Pin to Hero"}
-                            </button>
+                              <div className="min-w-0">
+                                <p className="line-clamp-2 font-semibold text-slate-900">
+                                  {article.title_en ||
+                                    article.title_kh ||
+                                    "Untitled article"}
+                                </p>
 
-                            {isPublished && (
-                              <Link
-                                to={`/news/${article.id}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                aria-label={`View ${getTitle(article)}`}
-                                title="View public article"
-                                className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 transition hover:bg-blue-100"
-                              >
-                                <Eye size={14} />
-                                View
-                                <ExternalLink size={12} />
-                              </Link>
+                                {article.title_kh && article.title_en && (
+                                  <p className="mt-1 line-clamp-1 text-sm text-slate-500">
+                                    {article.title_kh}
+                                  </p>
+                                )}
+
+                                <p className="mt-1 text-xs text-slate-400">
+                                  ID: {article.id.slice(0, 8)}…
+                                </p>
+                              </div>
+                            </div>
+                          </td>
+
+                          <td className="px-5 py-4">
+                            <span className="rounded-md bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
+                              {article.category || "Uncategorized"}
+                            </span>
+                          </td>
+
+                          <td className="px-5 py-4">
+                            <span
+                              className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
+                                article.status === "published"
+                                  ? "bg-green-100 text-green-700"
+                                  : "bg-amber-100 text-amber-700"
+                              }`}
+                            >
+                              {article.status === "published"
+                                ? "Published"
+                                : article.status === "draft"
+                                  ? "Draft / Deactivated"
+                                  : article.status || "Unknown"}
+                            </span>
+                          </td>
+
+                          <td className="whitespace-nowrap px-5 py-4 text-sm text-slate-500">
+                            {formatDate(
+                              article.published_at || article.created_at,
                             )}
+                          </td>
 
-                            <Link
-                              to={`/admin/news/${article.id}/edit`}
-                              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
-                            >
-                              <Pencil size={14} />
-                              Edit
-                            </Link>
+                          <td className="px-5 py-4">
+                            <div className="flex items-center justify-end gap-1">
+                              <button
+                                type="button"
+                                title="View article"
+                                onClick={() =>
+                                  navigate(`/news/${article.id}`)
+                                }
+                                className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-blue-700"
+                              >
+                                <Eye size={17} />
+                              </button>
 
-                            <button
-                              type="button"
-                              onClick={() => void deleteArticle(article.id)}
-                              disabled={deletingId === article.id}
-                              className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
-                            >
-                              <Trash2 size={14} />
-                              {deletingId === article.id
-                                ? "Deleting..."
-                                : "Delete"}
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
+                              <button
+                                type="button"
+                                title="Edit article"
+                                onClick={() =>
+                                  navigate(
+                                    `/admin/news/edit/${article.id}`,
+                                  )
+                                }
+                                className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-blue-700"
+                              >
+                                <Pencil size={17} />
+                              </button>
 
-                  {filteredArticles.length === 0 && (
-                    <tr>
-                      <td colSpan={7} className="px-5 py-16 text-center">
-                        <Newspaper
-                          size={32}
-                          className="mx-auto text-slate-300"
-                        />
+                              <button
+                                type="button"
+                                title={
+                                  article.is_pinned
+                                    ? "Unpin article"
+                                    : "Pin article"
+                                }
+                                disabled={isProcessing}
+                                onClick={() =>
+                                  void togglePinned(article)
+                                }
+                                className="rounded-lg p-2 text-slate-500 hover:bg-amber-50 hover:text-amber-700 disabled:opacity-50"
+                              >
+                                {article.is_pinned ? (
+                                  <PinOff size={17} />
+                                ) : (
+                                  <Pin size={17} />
+                                )}
+                              </button>
 
-                        <p className="mt-3 font-medium text-slate-700">
-                          No articles found
-                        </p>
+                              <button
+                                type="button"
+                                title={
+                                  article.status === "published"
+                                    ? "Deactivate article"
+                                    : "Publish article"
+                                }
+                                disabled={isProcessing}
+                                onClick={() =>
+                                  void toggleStatus(article)
+                                }
+                                className={`rounded-lg p-2 disabled:opacity-50 ${
+                                  article.status === "published"
+                                    ? "text-amber-600 hover:bg-amber-50"
+                                    : "text-green-600 hover:bg-green-50"
+                                }`}
+                              >
+                                {isProcessing ? (
+                                  <LoaderCircle
+                                    size={17}
+                                    className="animate-spin"
+                                  />
+                                ) : (
+                                  <Power size={17} />
+                                )}
+                              </button>
 
-                        <p className="mt-1 text-sm text-slate-500">
-                          {articles.length === 0
-                            ? "No articles are available to your current Supabase session."
-                            : "Try changing your search or filters."}
-                        </p>
-                      </td>
-                    </tr>
-                  )}
-                </>
-              )}
-            </tbody>
-          </table>
+                              <button
+                                type="button"
+                                title="Delete article"
+                                disabled={isProcessing}
+                                onClick={() =>
+                                  void deleteArticle(article)
+                                }
+                                className="rounded-lg p-2 text-red-500 hover:bg-red-50 hover:text-red-700 disabled:opacity-50"
+                              >
+                                <Trash2 size={17} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile cards */}
+              <div className="divide-y divide-slate-100 md:hidden">
+                {filteredArticles.map((article) => {
+                  const isProcessing =
+                    processingId === article.id;
+
+                  return (
+                    <div key={article.id} className="p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <h2 className="font-semibold text-slate-900">
+                            {article.title_en ||
+                              article.title_kh ||
+                              "Untitled article"}
+                          </h2>
+
+                          {article.title_kh && article.title_en && (
+                            <p className="mt-1 text-sm text-slate-500">
+                              {article.title_kh}
+                            </p>
+                          )}
+                        </div>
+
+                        {article.is_pinned && (
+                          <Pin
+                            size={17}
+                            className="shrink-0 text-amber-500"
+                          />
+                        )}
+                      </div>
+
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        <span className="rounded-md bg-slate-100 px-2.5 py-1 text-xs text-slate-700">
+                          {article.category || "Uncategorized"}
+                        </span>
+
+                        <span
+                          className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                            article.status === "published"
+                              ? "bg-green-100 text-green-700"
+                              : "bg-amber-100 text-amber-700"
+                          }`}
+                        >
+                          {article.status === "published"
+                            ? "Published"
+                            : article.status === "draft"
+                              ? "Draft / Deactivated"
+                              : article.status || "Unknown"}
+                        </span>
+
+                        <span className="text-xs text-slate-400">
+                          {formatDate(
+                            article.published_at || article.created_at,
+                          )}
+                        </span>
+                      </div>
+
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            navigate(`/news/${article.id}`)
+                          }
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700"
+                        >
+                          <Eye size={14} />
+                          View
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            navigate(
+                              `/admin/news/edit/${article.id}`,
+                            )
+                          }
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700"
+                        >
+                          <Pencil size={14} />
+                          Edit
+                        </button>
+
+                        <button
+                          type="button"
+                          disabled={isProcessing}
+                          onClick={() => void toggleStatus(article)}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 disabled:opacity-50"
+                        >
+                          {isProcessing ? (
+                            <LoaderCircle
+                              size={14}
+                              className="animate-spin"
+                            />
+                          ) : (
+                            <Power size={14} />
+                          )}
+
+                          {article.status === "published"
+                            ? "Deactivate"
+                            : "Publish"}
+                        </button>
+
+                        <button
+                          type="button"
+                          disabled={isProcessing}
+                          onClick={() => void togglePinned(article)}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 disabled:opacity-50"
+                        >
+                          {article.is_pinned ? (
+                            <PinOff size={14} />
+                          ) : (
+                            <Pin size={14} />
+                          )}
+
+                          {article.is_pinned ? "Unpin" : "Pin"}
+                        </button>
+
+                        <button
+                          type="button"
+                          disabled={isProcessing}
+                          onClick={() => void deleteArticle(article)}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-2 text-xs font-medium text-red-600 disabled:opacity-50"
+                        >
+                          <Trash2 size={14} />
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
+
+          {!loading && filteredArticles.length > 0 && (
+            <div className="border-t border-slate-200 bg-slate-50 px-5 py-3 text-xs text-slate-500">
+              Showing {filteredArticles.length} of {articles.length} articles
+            </div>
+          )}
         </div>
-      </section>
+      </div>
     </div>
   );
 }
+

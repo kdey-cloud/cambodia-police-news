@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { supabase } from "../../lib/supabase";
+import RichTextEditor from "../../components/admin/RichTextEditor";
 import {
   ArrowLeft,
   ImagePlus,
@@ -10,6 +11,10 @@ import {
   Save,
   Send,
   X,
+  FileText,
+  CalendarDays,
+  CheckCircle2,
+  Eye,
 } from "lucide-react";
 
 type Category = {
@@ -29,13 +34,8 @@ type ArticleForm = {
   category: string;
 };
 
-type SelectedImage = {
-  file: File;
-  preview: string;
-};
-
-const MAX_IMAGES = 20;
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+const STORAGE_BUCKET = "news-images";
 
 const initialForm: ArticleForm = {
   titlekh: "",
@@ -47,6 +47,12 @@ const initialForm: ArticleForm = {
   category: "",
 };
 
+function getSafeExtension(filename: string): string {
+  const extension = filename.split(".").pop()?.toLowerCase() || "jpg";
+
+  return /^[a-z0-9]+$/.test(extension) ? extension : "jpg";
+}
+
 export default function CreateNews() {
   const navigate = useNavigate();
   const { i18n } = useTranslation();
@@ -55,28 +61,44 @@ export default function CreateNews() {
 
   const [form, setForm] = useState<ArticleForm>(initialForm);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [images, setImages] = useState<SelectedImage[]>([]);
   const [loadingCategories, setLoadingCategories] = useState(true);
+
+  // Featured image
+  const [featuredImage, setFeaturedImage] = useState<File | null>(null);
+  const [featuredPreview, setFeaturedPreview] = useState("");
+
+  // Additional images
+  const [additionalImages, setAdditionalImages] = useState<File[]>([]);
+  const [additionalPreviews, setAdditionalPreviews] = useState<string[]>(
+    [],
+  );
+
+  // Track preview URLs.
+  const additionalPreviewsRef = useRef<string[]>([]);
+  const featuredPreviewRef = useRef<string | null>(null);
+
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<"draft" | "published">("draft");
+
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
+  // Load categories.
   useEffect(() => {
     let active = true;
 
     async function fetchCategories() {
       setLoadingCategories(true);
 
-      const { data, error } = await supabase
+      const { data, error: categoriesError } = await supabase
         .from("categories")
         .select("id, name_en, name_kh, slug")
         .order("name_en", { ascending: true });
 
       if (!active) return;
 
-      if (error) {
-        setError(error.message);
+      if (categoriesError) {
+        setError(categoriesError.message);
       } else {
         setCategories((data ?? []) as Category[]);
       }
@@ -91,11 +113,21 @@ export default function CreateNews() {
     };
   }, []);
 
+  // Release all preview URLs when component unmounts.
   useEffect(() => {
     return () => {
-      images.forEach((image) => URL.revokeObjectURL(image.preview));
+      if (featuredPreviewRef.current) {
+        URL.revokeObjectURL(featuredPreviewRef.current);
+      }
+
+      additionalPreviewsRef.current.forEach((preview) => {
+        URL.revokeObjectURL(preview);
+      });
+
+      additionalPreviewsRef.current = [];
+      featuredPreviewRef.current = null;
     };
-  }, [images]);
+  }, []);
 
   function updateField(field: keyof ArticleForm, value: string) {
     setForm((previous) => ({
@@ -109,89 +141,187 @@ export default function CreateNews() {
     setSuccess("");
   }
 
-  function handleImageChange(event: ChangeEvent<HTMLInputElement>) {
-    const selectedFiles = Array.from(event.target.files ?? []);
+  function createFeaturedPreview(file: File) {
+    if (featuredPreviewRef.current) {
+      URL.revokeObjectURL(featuredPreviewRef.current);
+    }
 
-    // Reset the input so the same file can be selected again.
+    const preview = URL.createObjectURL(file);
+
+    featuredPreviewRef.current = preview;
+    setFeaturedPreview(preview);
+  }
+
+  // Select featured image.
+  function handleFeaturedImageChange(
+    event: ChangeEvent<HTMLInputElement>,
+  ) {
+    const file = event.target.files?.[0];
+
     event.target.value = "";
 
-    if (selectedFiles.length === 0) return;
+    if (!file) return;
 
     setError("");
     setSuccess("");
 
-    const remainingSlots = MAX_IMAGES - images.length;
-
-    if (remainingSlots <= 0) {
+    if (!file.type.startsWith("image/")) {
       showError(
         isKhmer
-          ? `អាចបញ្ចូលរូបភាពបានត្រឹមតែ ${MAX_IMAGES} រូបប៉ុណ្ណោះ។`
-          : `You can upload a maximum of ${MAX_IMAGES} images.`,
+          ? "សូមជ្រើសរើសឯកសាររូបភាព។"
+          : "Please select an image file.",
       );
       return;
     }
 
-    const acceptedFiles: File[] = [];
+    if (file.size > MAX_IMAGE_SIZE) {
+      showError(
+        isKhmer
+          ? "រូបភាពមិនអាចលើសពី 5MB បានទេ។"
+          : "The image must be 5MB or smaller.",
+      );
+      return;
+    }
 
-    for (const file of selectedFiles) {
+    setFeaturedImage(file);
+    createFeaturedPreview(file);
+  }
+
+  // Remove featured image.
+  function removeFeaturedImage() {
+    if (featuredPreviewRef.current) {
+      URL.revokeObjectURL(featuredPreviewRef.current);
+      featuredPreviewRef.current = null;
+    }
+
+    setFeaturedImage(null);
+    setFeaturedPreview("");
+  }
+
+  // Select additional images.
+  function handleAdditionalImagesChange(
+    event: ChangeEvent<HTMLInputElement>,
+  ) {
+    const files = Array.from(event.target.files ?? []);
+
+    event.target.value = "";
+
+    if (files.length === 0) return;
+
+    setError("");
+    setSuccess("");
+
+    const validFiles: File[] = [];
+    const errors: string[] = [];
+
+    for (const file of files) {
       if (!file.type.startsWith("image/")) {
-        showError(
-          isKhmer
-            ? "សូមជ្រើសរើសឯកសាររូបភាពប៉ុណ្ណោះ។"
-            : "Please select image files only.",
-        );
+        errors.push(`${file.name}: Not an image file.`);
         continue;
       }
 
       if (file.size > MAX_IMAGE_SIZE) {
-        showError(
-          isKhmer
-            ? `${file.name} មានទំហំលើសពី 5MB។`
-            : `${file.name} exceeds the 5MB size limit.`,
-        );
+        errors.push(`${file.name}: Image must be 5MB or smaller.`);
         continue;
       }
 
-      acceptedFiles.push(file);
+      validFiles.push(file);
     }
 
-    const availableFiles = acceptedFiles.slice(0, remainingSlots);
+    if (validFiles.length > 0) {
+      const newPreviews = validFiles.map((file) =>
+        URL.createObjectURL(file),
+      );
 
-    if (acceptedFiles.length > remainingSlots) {
+      additionalPreviewsRef.current = [
+        ...additionalPreviewsRef.current,
+        ...newPreviews,
+      ];
+
+      setAdditionalImages((previous) => [
+        ...previous,
+        ...validFiles,
+      ]);
+
+      setAdditionalPreviews((previous) => [
+        ...previous,
+        ...newPreviews,
+      ]);
+    }
+
+    if (errors.length > 0) {
       showError(
         isKhmer
-          ? `អាចបន្ថែមរូបភាពបានត្រឹមតែ ${remainingSlots} រូបទៀត។`
-          : `You can add only ${remainingSlots} more images.`,
+          ? `រូបភាពមួយចំនួនមិនអាចបន្ថែមបាន៖ ${errors.join(" ")}`
+          : errors.join(" "),
       );
     }
+  }
 
-    if (availableFiles.length > 0) {
-      const newImages = availableFiles.map((file) => ({
-        file,
-        preview: URL.createObjectURL(file),
-      }));
+  // Remove one additional image.
+  function removeAdditionalImage(index: number) {
+    const preview = additionalPreviews[index];
 
-      setImages((previous) => [...previous, ...newImages]);
+    if (preview) {
+      URL.revokeObjectURL(preview);
+
+      additionalPreviewsRef.current =
+        additionalPreviewsRef.current.filter(
+          (item) => item !== preview,
+        );
     }
+
+    setAdditionalImages((previous) =>
+      previous.filter((_, imageIndex) => imageIndex !== index),
+    );
+
+    setAdditionalPreviews((previous) =>
+      previous.filter((_, imageIndex) => imageIndex !== index),
+    );
   }
 
-  function removeImage(indexToRemove: number) {
-    setImages((previous) => {
-      const imageToRemove = previous[indexToRemove];
-
-      if (imageToRemove) {
-        URL.revokeObjectURL(imageToRemove.preview);
-      }
-
-      return previous.filter((_, index) => index !== indexToRemove);
+  // Remove all additional images.
+  function removeAllAdditionalImages() {
+    additionalPreviews.forEach((preview) => {
+      URL.revokeObjectURL(preview);
     });
+
+    additionalPreviewsRef.current = [];
+
+    setAdditionalImages([]);
+    setAdditionalPreviews([]);
   }
 
-  async function handleSave(nextStatus: "draft" | "published") {
+  // Upload an image to Supabase Storage.
+  async function uploadImage(file: File, path: string) {
+    const { error: uploadError } = await supabase.storage
+      .from(STORAGE_BUCKET)
+      .upload(path, file, {
+        cacheControl: "3600",
+        upsert: false,
+        contentType: file.type,
+      });
+
+    if (uploadError) {
+      throw new Error(uploadError.message);
+    }
+
+    const { data } = supabase.storage
+      .from(STORAGE_BUCKET)
+      .getPublicUrl(path);
+
+    return data.publicUrl;
+  }
+
+  // Save as draft or publish.
+  async function handleSave(
+    nextStatus: "draft" | "published",
+  ) {
+    if (saving) return;
+
     setError("");
     setSuccess("");
 
-    // Require a title in at least one language.
     if (!form.titlekh.trim() && !form.titleEn.trim()) {
       showError(
         isKhmer
@@ -201,7 +331,6 @@ export default function CreateNews() {
       return;
     }
 
-    // Require a category.
     if (!form.category) {
       showError(
         isKhmer
@@ -211,82 +340,49 @@ export default function CreateNews() {
       return;
     }
 
-    if (categories.length === 0) {
-      showError(
-        isKhmer
-          ? "មិនមានប្រភេទព័ត៌មានទេ។ សូមបង្កើតប្រភេទព័ត៌មានជាមុន។"
-          : "No categories are available. Please create a category first.",
-      );
-      return;
-    }
-
-    // Article content is optional.
-    // Do not require contentkh or contentEn to publish.
-
     setSaving(true);
     setStatus(nextStatus);
 
-    const uploadedPaths: string[] = [];
+    let uploadedFeaturedPath: string | null = null;
     let createdNewsId: string | null = null;
 
+    const uploadedAdditionalPaths: string[] = [];
+
     try {
-      // Upload images first.
-      const imageUrls: string[] = [];
+      let imageUrl: string | null = null;
 
-      for (let index = 0; index < images.length; index++) {
-        const file = images[index].file;
-        const extension = file.name.split(".").pop()?.toLowerCase() || "jpg";
+      // 1. Upload featured image.
+      if (featuredImage) {
+        const extension = getSafeExtension(featuredImage.name);
 
-        const safeExtension = /^[a-z0-9]+$/.test(extension) ? extension : "jpg";
+        uploadedFeaturedPath =
+          `news/${crypto.randomUUID()}.${extension}`;
 
-        const filePath = `news/${crypto.randomUUID()}-${index}.${safeExtension}`;
-
-        const { error: uploadError } = await supabase.storage
-          .from("news-images")
-          .upload(filePath, file, {
-            cacheControl: "3600",
-            upsert: false,
-            contentType: file.type,
-          });
-
-        if (uploadError) {
-          throw new Error(
-            isKhmer
-              ? `មិនអាចបញ្ចូលរូបភាព ${file.name} បានទេ៖ ${uploadError.message}`
-              : `Failed to upload ${file.name}: ${uploadError.message}`,
-          );
-        }
-
-        uploadedPaths.push(filePath);
-
-        const { data: publicUrlData } = supabase.storage
-          .from("news-images")
-          .getPublicUrl(filePath);
-
-        imageUrls.push(publicUrlData.publicUrl);
+        imageUrl = await uploadImage(
+          featuredImage,
+          uploadedFeaturedPath,
+        );
       }
 
-      // Insert the news article.
+      // 2. Create news record.
       const { data: newsData, error: newsError } = await supabase
         .from("news")
         .insert({
           title_kh: form.titlekh.trim() || null,
           summary_kh: form.summarykh.trim() || null,
-
-          // Empty article content is saved as null.
           content_kh: form.contentkh.trim() || null,
 
           title_en: form.titleEn.trim() || null,
           summary_en: form.summaryEn.trim() || null,
-
-          // Empty article content is saved as null.
           content_en: form.contentEn.trim() || null,
 
           category: form.category,
-          image_url: imageUrls[0] || null,
+          image_url: imageUrl,
           status: nextStatus,
           published_at:
-            nextStatus === "published" ? new Date().toISOString() : null,
+            nextStatus === "published"
+              ? new Date().toISOString()
+              : null,
         })
         .select("id")
         .single();
@@ -296,32 +392,47 @@ export default function CreateNews() {
       }
 
       if (!newsData) {
-        throw new Error(
-          isKhmer
-            ? "មិនអាចបង្កើតព័ត៌មានបានទេ។"
-            : "Could not create the news article.",
-        );
+        throw new Error("The news article could not be created.");
       }
 
       createdNewsId = newsData.id;
 
-      // Save additional images to news_images.
-      // The first image is stored in news.image_url.
-      // Additional images begin at display_order 2.
-      if (imageUrls.length > 1) {
-        const additionalImages = imageUrls.slice(1).map((imageUrl, index) => ({
-          news_id: newsData.id,
-          image_url: imageUrl,
-          alt_text: null,
-          display_order: index + 2,
-        }));
+      // 3. Upload additional images.
+      if (additionalImages.length > 0) {
+        const imageRecords: {
+          news_id: string;
+          image_url: string;
+          alt_text: string | null;
+          display_order: number;
+        }[] = [];
 
-        const { error: galleryError } = await supabase
+        for (const [index, file] of additionalImages.entries()) {
+          const extension = getSafeExtension(file.name);
+
+          const imagePath =
+            `news/${newsData.id}/${crypto.randomUUID()}.${extension}`;
+
+          const publicUrl = await uploadImage(file, imagePath);
+
+          uploadedAdditionalPaths.push(imagePath);
+
+          imageRecords.push({
+            news_id: newsData.id,
+            image_url: publicUrl,
+            alt_text: file.name,
+            display_order: index + 1,
+          });
+        }
+
+        // 4. Insert additional image records.
+        const { error: imagesInsertError } = await supabase
           .from("news_images")
-          .insert(additionalImages);
+          .insert(imageRecords);
 
-        if (galleryError) {
-          throw new Error(galleryError.message);
+        if (imagesInsertError) {
+          throw new Error(
+            `Could not save additional image records: ${imagesInsertError.message}`,
+          );
         }
       }
 
@@ -335,19 +446,53 @@ export default function CreateNews() {
             : "Draft saved successfully!",
       );
 
-      setTimeout(() => {
+      window.setTimeout(() => {
         navigate("/admin/news");
-      }, 1200);
-    } catch (err) {
-      // Attempt to clean up uploaded files if saving fails.
-      if (uploadedPaths.length > 0) {
-        await supabase.storage.from("news-images").remove(uploadedPaths);
+      }, 1000);
+    } catch (err: unknown) {
+      console.error("[CreateNews] Save failed:", err);
+
+      // Remove incomplete news record.
+      if (createdNewsId) {
+        const { error: deleteError } = await supabase
+          .from("news")
+          .delete()
+          .eq("id", createdNewsId);
+
+        if (deleteError) {
+          console.error(
+            "[CreateNews] Could not remove incomplete article:",
+            deleteError,
+          );
+        }
       }
 
-      // If the article was created but saving the gallery failed,
-      // attempt to remove the incomplete article.
-      if (createdNewsId) {
-        await supabase.from("news").delete().eq("id", createdNewsId);
+      // Remove uploaded additional images.
+      if (uploadedAdditionalPaths.length > 0) {
+        const { error: cleanupError } = await supabase.storage
+          .from(STORAGE_BUCKET)
+          .remove(uploadedAdditionalPaths);
+
+        if (cleanupError) {
+          console.error(
+            "[CreateNews] Additional image cleanup failed:",
+            cleanupError,
+          );
+        }
+      }
+
+      // Remove featured image.
+      if (uploadedFeaturedPath) {
+        const { error: cleanupError } = await supabase.storage
+          .from(STORAGE_BUCKET)
+          .remove([uploadedFeaturedPath]);
+
+        if (cleanupError) {
+          console.error(
+            "[CreateNews] Featured image cleanup failed:",
+            cleanupError,
+          );
+        }
       }
 
       showError(
@@ -368,46 +513,94 @@ export default function CreateNews() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 px-4 py-8 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-5xl">
-        {/* Header */}
-        <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
-          <div>
+    <div className="min-h-screen bg-[#f5f6f8]">
+      {/* Top toolbar */}
+      <header className="sticky top-0 z-30 border-b border-slate-200 bg-white">
+        <div className="mx-auto flex max-w-[1600px] items-center justify-between gap-4 px-4 py-3 sm:px-6">
+          <div className="flex min-w-0 items-center gap-3">
             <button
               type="button"
               onClick={() => navigate("/admin/news")}
-              className="mb-4 inline-flex items-center gap-2 text-sm font-medium text-slate-500 transition hover:text-blue-600"
+              aria-label="Back to news"
+              className="rounded-lg p-2 text-slate-600 transition hover:bg-slate-100"
             >
-              <ArrowLeft size={18} />
-              {isKhmer ? "ត្រឡប់ទៅព័ត៌មាន" : "Back to News"}
+              <ArrowLeft size={20} />
             </button>
 
-            <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">
-              {isKhmer ? "បង្កើតព័ត៌មានថ្មី" : "Create News"}
-            </h1>
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-700 text-white">
+              <FileText size={21} />
+            </div>
 
-            <p className="mt-2 text-sm text-slate-500">
-              {isKhmer
-                ? "បញ្ចូលព័ត៌មានខាងក្រោមដើម្បីបង្កើតអត្ថបទថ្មី។"
-                : "Fill in the information below to create a news article."}
-            </p>
+            <div className="min-w-0">
+              <h1 className="truncate text-lg font-bold text-slate-900">
+                {isKhmer ? "បង្កើតព័ត៌មានថ្មី" : "New Article"}
+              </h1>
+
+              <p className="hidden text-xs text-slate-500 sm:block">
+                {isKhmer
+                  ? "កម្មវិធីគ្រប់គ្រងព័ត៌មាន"
+                  : "News Content Management"}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex shrink-0 items-center gap-2">
+            <span className="hidden items-center gap-1.5 rounded-full bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700 sm:inline-flex">
+              <span className="h-2 w-2 rounded-full bg-amber-500" />
+              {isKhmer ? "សេចក្តីព្រាង" : "New draft"}
+            </span>
+
+            <button
+              type="button"
+              onClick={() => void handleSave("draft")}
+              disabled={saving || loadingCategories}
+              className="hidden items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50 sm:inline-flex"
+            >
+              {saving && status === "draft" ? (
+                <LoaderCircle size={16} className="animate-spin" />
+              ) : (
+                <Save size={16} />
+              )}
+
+              {isKhmer ? "រក្សាទុក" : "Save Draft"}
+            </button>
+
+            <button
+              type="submit"
+              form="create-news-form"
+              disabled={saving || loadingCategories}
+              className="inline-flex items-center gap-2 rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-800 disabled:opacity-50"
+            >
+              {saving && status === "published" ? (
+                <LoaderCircle size={16} className="animate-spin" />
+              ) : (
+                <Send size={16} />
+              )}
+
+              {isKhmer ? "ផ្សព្វផ្សាយ" : "Publish"}
+            </button>
           </div>
         </div>
+      </header>
 
-        {/* Alerts */}
+      <main className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6 lg:py-8">
+        {/* Notifications */}
         {error && (
           <div
             role="alert"
-            className="mb-6 flex items-start justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+            className="mb-5 flex items-start justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
           >
-            <p>{error}</p>
+            <div className="flex items-start gap-2">
+              <X size={18} className="mt-0.5 shrink-0" />
+              <p className="break-words">{error}</p>
+            </div>
 
             <button
               type="button"
               onClick={() => setError("")}
               aria-label="Dismiss error"
             >
-              <X size={18} />
+              <X size={17} />
             </button>
           </div>
         )}
@@ -415,334 +608,602 @@ export default function CreateNews() {
         {success && (
           <div
             role="status"
-            className="mb-6 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700"
+            className="mb-5 flex items-center gap-2 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700"
           >
+            <CheckCircle2 size={19} />
             {success}
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Khmer */}
-          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
-            <div className="mb-6 border-b border-slate-100 pb-4">
-              <h2 className="text-lg font-bold text-slate-900">
-                ព័ត៌មានជាភាសាខ្មែរ
-              </h2>
+        <form
+          id="create-news-form"
+          onSubmit={handleSubmit}
+          className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_350px]"
+        >
+          {/* Main editor */}
+          <div className="min-w-0 space-y-5">
+            {/* Titles and summaries */}
+            <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
+              <div className="mb-5">
+                <h2 className="text-base font-bold text-slate-900">
+                  {isKhmer ? "ចំណងជើង និងសេចក្តីសង្ខេប" : "Article Details"}
+                </h2>
 
-              <p className="mt-1 text-sm text-slate-500">
-                {isKhmer
-                  ? "វាលដែលមានសញ្ញា * គឺត្រូវបំពេញ។"
-                  : "The title is required in at least one language."}
-              </p>
-            </div>
-
-            <div className="space-y-5">
-              <div>
-                <label
-                  htmlFor="title-kh"
-                  className="mb-2 block text-sm font-semibold text-slate-700"
-                >
-                  ចំណងជើង
-                </label>
-
-                <input
-                  id="title-kh"
-                  type="text"
-                  value={form.titlekh}
-                  onChange={(event) =>
-                    updateField("titlekh", event.target.value)
-                  }
-                  placeholder="បញ្ចូលចំណងជើងជាភាសាខ្មែរ..."
-                  className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                />
+                <p className="mt-1 text-sm text-slate-500">
+                  Enter your article title and summary in both languages.
+                </p>
               </div>
 
-              <div>
-                <label
-                  htmlFor="summary-kh"
-                  className="mb-2 block text-sm font-semibold text-slate-700"
-                >
-                  សេចក្តីសង្ខេប
-                  <span className="ml-2 text-xs font-normal text-slate-400">
-                    (មិនចាំបាច់បំពេញ)
-                  </span>
-                </label>
+              <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+                {/* English title */}
+                <div>
+                  <label
+                    htmlFor="title-en"
+                    className="mb-2 block text-sm font-semibold text-slate-700"
+                  >
+                    English Title
+                  </label>
 
-                <textarea
-                  id="summary-kh"
-                  rows={3}
-                  value={form.summarykh}
-                  onChange={(event) =>
-                    updateField("summarykh", event.target.value)
-                  }
-                  placeholder="បញ្ចូលសេចក្តីសង្ខេប..."
-                  className="w-full resize-y rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                />
+                  <input
+                    id="title-en"
+                    type="text"
+                    value={form.titleEn}
+                    onChange={(event) =>
+                      updateField("titleEn", event.target.value)
+                    }
+                    placeholder="Enter your English headline..."
+                    className="w-full rounded-lg border border-slate-300 px-4 py-3 text-base font-semibold text-slate-900 outline-none transition placeholder:font-normal placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  />
+                </div>
+
+                {/* Khmer title */}
+                <div>
+                  <label
+                    htmlFor="title-kh"
+                    className="mb-2 block text-sm font-semibold text-slate-700"
+                  >
+                    ចំណងជើងជាភាសាខ្មែរ
+                  </label>
+
+                  <input
+                    id="title-kh"
+                    type="text"
+                    value={form.titlekh}
+                    onChange={(event) =>
+                      updateField("titlekh", event.target.value)
+                    }
+                    placeholder="បញ្ចូលចំណងជើងជាភាសាខ្មែរ..."
+                    className="w-full rounded-lg border border-slate-300 px-4 py-3 text-sm outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  />
+                </div>
+
+                {/* English summary */}
+                <div>
+                  <label
+                    htmlFor="summary-en"
+                    className="mb-2 block text-sm font-semibold text-slate-700"
+                  >
+                    English Summary
+                  </label>
+
+                  <textarea
+                    id="summary-en"
+                    rows={6}
+                    value={form.summaryEn}
+                    onChange={(event) =>
+                      updateField("summaryEn", event.target.value)
+                    }
+                    placeholder="Write a short summary of this news..."
+                    className="w-full resize-y rounded-lg border border-slate-300 px-4 py-3 text-sm leading-7 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  />
+                </div>
+
+                {/* Khmer summary */}
+                <div>
+                  <label
+                    htmlFor="summary-kh"
+                    className="mb-2 block text-sm font-semibold text-slate-700"
+                  >
+                    សេចក្តីសង្ខេបជាភាសាខ្មែរ
+                  </label>
+
+                  <textarea
+                    id="summary-kh"
+                    rows={6}
+                    value={form.summarykh}
+                    onChange={(event) =>
+                      updateField("summarykh", event.target.value)
+                    }
+                    placeholder="សរសេរសេចក្តីសង្ខេបព័ត៌មាន..."
+                    className="w-full resize-y rounded-lg border border-slate-300 px-4 py-3 text-sm leading-8 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  />
+                </div>
               </div>
+            </section>
 
-              <div>
-                <label
-                  htmlFor="content-kh"
-                  className="mb-2 block text-sm font-semibold text-slate-700"
-                >
-                  ខ្លឹមសារព័ត៌មាន
-                  <span className="ml-2 text-xs font-normal text-slate-400">
-                    (មិនចាំបាច់បំពេញ)
-                  </span>
-                </label>
-
-                <textarea
-                  id="content-kh"
-                  rows={8}
-                  value={form.contentkh}
-                  onChange={(event) =>
-                    updateField("contentkh", event.target.value)
-                  }
-                  placeholder="សរសេរខ្លឹមសារព័ត៌មាន ប្រសិនបើមាន..."
-                  className="w-full resize-y rounded-xl border border-slate-300 px-4 py-3 text-sm leading-7 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                />
-              </div>
-            </div>
-          </section>
-
-          {/* English */}
-          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
-            <div className="mb-6 border-b border-slate-100 pb-4">
-              <h2 className="text-lg font-bold text-slate-900">
-                English Content
-              </h2>
-
-              <p className="mt-1 text-sm text-slate-500">
-                Enter an English title if you want to publish the English
-                version.
-              </p>
-            </div>
-
-            <div className="space-y-5">
-              <div>
-                <label
-                  htmlFor="title-en"
-                  className="mb-2 block text-sm font-semibold text-slate-700"
-                >
-                  Title
-                </label>
-
-                <input
-                  id="title-en"
-                  type="text"
-                  value={form.titleEn}
-                  onChange={(event) =>
-                    updateField("titleEn", event.target.value)
-                  }
-                  placeholder="Enter the English title..."
-                  className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                />
-              </div>
-
-              <div>
-                <label
-                  htmlFor="summary-en"
-                  className="mb-2 block text-sm font-semibold text-slate-700"
-                >
-                  Summary
-                  <span className="ml-2 text-xs font-normal text-slate-400">
-                    (Optional)
-                  </span>
-                </label>
-
-                <textarea
-                  id="summary-en"
-                  rows={3}
-                  value={form.summaryEn}
-                  onChange={(event) =>
-                    updateField("summaryEn", event.target.value)
-                  }
-                  placeholder="Enter a short summary..."
-                  className="w-full resize-y rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                />
-              </div>
-
-              <div>
-                <label
-                  htmlFor="content-en"
-                  className="mb-2 block text-sm font-semibold text-slate-700"
-                >
-                  Article Content
-                  <span className="ml-2 text-xs font-normal text-slate-400">
-                    (Optional)
-                  </span>
-                </label>
-
-                <textarea
-                  id="content-en"
-                  rows={8}
-                  value={form.contentEn}
-                  onChange={(event) =>
-                    updateField("contentEn", event.target.value)
-                  }
-                  placeholder="Write the article content here (optional)..."
-                  className="w-full resize-y rounded-xl border border-slate-300 px-4 py-3 text-sm leading-7 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                />
-              </div>
-            </div>
-          </section>
-
-          {/* Category */}
-          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
-            <h2 className="mb-5 text-lg font-bold text-slate-900">
-              {isKhmer ? "ប្រភេទព័ត៌មាន" : "News Category"}
-            </h2>
-
-            <label
-              htmlFor="category"
-              className="mb-2 block text-sm font-semibold text-slate-700"
-            >
-              {isKhmer ? "ជ្រើសរើសប្រភេទ" : "Select Category"}
-              <span className="ml-1 text-red-500">*</span>
-            </label>
-
-            <select
-              id="category"
-              value={form.category}
-              onChange={(event) => updateField("category", event.target.value)}
-              disabled={loadingCategories}
-              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-100"
-            >
-              <option value="">
-                {loadingCategories
-                  ? isKhmer
-                    ? "កំពុងផ្ទុកប្រភេទ..."
-                    : "Loading categories..."
-                  : isKhmer
-                    ? "ជ្រើសរើសប្រភេទព័ត៌មាន"
-                    : "Choose a category"}
-              </option>
-
-              {categories.map((category) => (
-                <option key={category.id} value={category.slug}>
-                  {isKhmer ? category.name_kh : category.name_en}
-                </option>
-              ))}
-            </select>
-          </section>
-
-          {/* Images */}
-          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
-            <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <h2 className="text-lg font-bold text-slate-900">
-                  {isKhmer ? "រូបភាពព័ត៌មាន" : "News Images"}
+            {/* Featured image */}
+            <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
+              <div className="mb-4">
+                <h2 className="text-base font-bold text-slate-900">
+                  {isKhmer ? "រូបភាពមេ" : "Featured Image"}
                 </h2>
 
                 <p className="mt-1 text-sm text-slate-500">
                   {isKhmer
-                    ? "អាចបញ្ចូលរូបភាពបានរហូតដល់ 20 រូប។ មួយរូបមិនលើសពី 5MB។"
-                    : "Upload up to 20 images. Each image must be 5MB or smaller."}
+                    ? "រូបភាពនេះនឹងបង្ហាញលើកាតព័ត៌មាន និងផ្នែកខាងលើនៃអត្ថបទ។"
+                    : "This image appears on the news card and at the top of the article."}
                 </p>
               </div>
 
-              <span className="rounded-full bg-blue-50 px-3 py-1 text-sm font-semibold text-blue-700">
-                {images.length}/{MAX_IMAGES}
-              </span>
-            </div>
+              {featuredPreview ? (
+                <div className="relative overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
+                  <img
+                    src={featuredPreview}
+                    alt="Featured image preview"
+                    className="max-h-[420px] w-full object-contain"
+                  />
 
-            <label
-              htmlFor="news-images"
-              className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-300 px-5 py-10 text-center transition hover:border-blue-400 hover:bg-blue-50/50"
-            >
-              <ImagePlus size={32} className="mb-3 text-blue-600" />
-
-              <span className="text-sm font-semibold text-slate-800">
-                {isKhmer ? "ចុចដើម្បីជ្រើសរើសរូបភាព" : "Click to select images"}
-              </span>
-
-              <span className="mt-1 text-xs text-slate-500">
-                PNG, JPG, JPEG, WEBP
-              </span>
-
-              <input
-                id="news-images"
-                type="file"
-                accept="image/*"
-                multiple
-                onChange={handleImageChange}
-                disabled={images.length >= MAX_IMAGES}
-                className="sr-only"
-              />
-            </label>
-
-            {images.length > 0 && (
-              <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
-                {images.map((image, index) => (
-                  <div
-                    key={image.preview}
-                    className="group relative overflow-hidden rounded-xl border border-slate-200 bg-slate-50"
+                  <button
+                    type="button"
+                    onClick={removeFeaturedImage}
+                    disabled={saving}
+                    className="absolute right-3 top-3 inline-flex items-center gap-2 rounded-lg bg-white px-3 py-2 text-sm font-medium text-red-600 shadow-md transition hover:bg-red-50 disabled:opacity-50"
                   >
-                    <img
-                      src={image.preview}
-                      alt={image.file.name}
-                      className="h-36 w-full object-contain"
+                    <X size={16} />
+                    {isKhmer ? "ដករូបភាព" : "Remove"}
+                  </button>
+
+                  <div className="border-t border-slate-200 bg-white px-4 py-3 text-sm text-slate-500">
+                    {featuredImage?.name}
+                  </div>
+                </div>
+              ) : (
+                <label
+                  htmlFor="featured-image"
+                  className="flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-slate-300 px-5 py-12 text-center transition hover:border-blue-400 hover:bg-blue-50/40"
+                >
+                  <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100 text-slate-500">
+                    <ImagePlus size={25} />
+                  </div>
+
+                  <span className="text-sm font-semibold text-slate-800">
+                    {isKhmer
+                      ? "ចុចដើម្បីជ្រើសរើសរូបភាព"
+                      : "Select featured image"}
+                  </span>
+
+                  <span className="mt-2 text-xs text-slate-500">
+                    PNG, JPG, WEBP · Maximum 5MB
+                  </span>
+
+                  <input
+                    id="featured-image"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFeaturedImageChange}
+                    disabled={saving}
+                    className="sr-only"
+                  />
+                </label>
+              )}
+
+              {featuredPreview && (
+                <label className="mt-4 inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50">
+                  <ImagePlus size={17} />
+                  {isKhmer ? "ផ្លាស់ប្តូររូបភាព" : "Change image"}
+
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFeaturedImageChange}
+                    disabled={saving}
+                    className="sr-only"
+                  />
+                </label>
+              )}
+            </section>
+
+            {/* Article content - English and Khmer */}
+            <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
+              <div className="mb-5">
+                <h2 className="text-base font-bold text-slate-900">
+                  {isKhmer ? "ខ្លឹមសារព័ត៌មាន" : "Article Content"}
+                </h2>
+
+                <p className="mt-1 text-sm text-slate-500">
+                  Write and format your article in both languages.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 gap-8 xl:grid-cols-2">
+                {/* English editor */}
+                <div className="min-w-0">
+                  <h3 className="mb-3 text-sm font-semibold text-slate-700">
+                    English Content
+                  </h3>
+
+                  <div className="[&_.tiptap]:min-h-[600px] [&_.ProseMirror]:min-h-[600px]">
+                    <RichTextEditor
+                      value={form.contentEn}
+                      onChange={(value) =>
+                        updateField("contentEn", value)
+                      }
+                      placeholder="Start writing your English news article..."
+                      language="en"
+                      disabled={saving}
+                    />
+                  </div>
+                </div>
+
+                {/* Khmer editor */}
+                <div className="min-w-0">
+                  <h3 className="mb-3 text-sm font-semibold text-slate-700">
+                    ខ្លឹមសារជាភាសាខ្មែរ
+                  </h3>
+
+                  <div className="[&_.tiptap]:min-h-[600px] [&_.ProseMirror]:min-h-[600px]">
+                    <RichTextEditor
+                      value={form.contentkh}
+                      onChange={(value) =>
+                        updateField("contentkh", value)
+                      }
+                      placeholder="សរសេរខ្លឹមសារព័ត៌មានជាភាសាខ្មែរ..."
+                      language="km"
+                      disabled={saving}
+                    />
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            {/* Additional images */}
+            <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
+              <div className="mb-5">
+                <h2 className="text-base font-bold text-slate-900">
+                  {isKhmer
+                    ? "រូបភាពបន្ថែមក្នុងអត្ថបទ"
+                    : "Additional Article Images"}
+                </h2>
+
+                <p className="mt-1 text-sm text-slate-500">
+                  {isKhmer
+                    ? "បន្ថែមរូបភាពជាច្រើនសម្រាប់បង្ហាញជាមួយអត្ថបទព័ត៌មាន។ រូបភាពនីមួយៗមិនអាចលើសពី 5MB បានទេ។"
+                    : "Upload multiple images to display with your news article. Each image must be 5MB or smaller."}
+                </p>
+              </div>
+
+              <label
+                htmlFor="additional-images"
+                className={`flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-slate-300 px-5 py-8 text-center transition ${
+                  saving
+                    ? "cursor-not-allowed opacity-50"
+                    : "cursor-pointer hover:border-blue-400 hover:bg-blue-50/40"
+                }`}
+              >
+                <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100 text-slate-500">
+                  <ImagePlus size={25} />
+                </div>
+
+                <span className="text-sm font-semibold text-slate-800">
+                  {isKhmer
+                    ? "ចុចដើម្បីបន្ថែមរូបភាព"
+                    : "Click to add images"}
+                </span>
+
+                <span className="mt-2 text-xs text-slate-500">
+                  PNG, JPG, WEBP · Maximum 5MB per image
+                </span>
+
+                <input
+                  id="additional-images"
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={handleAdditionalImagesChange}
+                  disabled={saving}
+                  className="sr-only"
+                />
+              </label>
+
+              {additionalImages.length > 0 && (
+                <div className="mt-5">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <h3 className="text-sm font-semibold text-slate-800">
+                      {isKhmer
+                        ? "រូបភាពដែលបានជ្រើសរើស"
+                        : "Selected Images"}
+                    </h3>
+
+                    <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
+                      {additionalImages.length}{" "}
+                      {isKhmer ? "រូបភាព" : "images"}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+                    {additionalPreviews.map((preview, index) => (
+                      <div
+                        key={`${additionalImages[index]?.name}-${index}`}
+                        className="group relative overflow-hidden rounded-lg border border-slate-200 bg-slate-50"
+                      >
+                        <img
+                          src={preview}
+                          alt={
+                            additionalImages[index]?.name ??
+                            "Article image"
+                          }
+                          className="h-36 w-full object-cover"
+                        />
+
+                        <button
+                          type="button"
+                          onClick={() => removeAdditionalImage(index)}
+                          disabled={saving}
+                          aria-label={`Remove image ${index + 1}`}
+                          className="absolute right-2 top-2 rounded-lg bg-white/95 p-2 text-red-600 shadow transition hover:bg-red-50 disabled:opacity-50"
+                        >
+                          <X size={16} />
+                        </button>
+
+                        <div className="px-3 py-2">
+                          <p className="truncate text-xs font-medium text-slate-700">
+                            {additionalImages[index]?.name}
+                          </p>
+
+                          <p className="mt-1 text-xs text-slate-500">
+                            {(
+                              (additionalImages[index]?.size ?? 0) /
+                              (1024 * 1024)
+                            ).toFixed(2)}{" "}
+                            MB
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={removeAllAdditionalImages}
+                    disabled={saving}
+                    className="mt-4 text-sm font-medium text-red-600 transition hover:text-red-700 disabled:opacity-50"
+                  >
+                    {isKhmer
+                      ? "លុបរូបភាពទាំងអស់"
+                      : "Remove all images"}
+                  </button>
+                </div>
+              )}
+            </section>
+
+            {/* Mobile publishing buttons */}
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:hidden">
+              <button
+                type="button"
+                onClick={() => void handleSave("draft")}
+                disabled={saving || loadingCategories}
+                className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 disabled:opacity-50"
+              >
+                {saving && status === "draft" ? (
+                  <LoaderCircle size={17} className="animate-spin" />
+                ) : (
+                  <Save size={17} />
+                )}
+                {isKhmer ? "រក្សាទុកសេចក្តីព្រាង" : "Save Draft"}
+              </button>
+
+              <button
+                type="submit"
+                disabled={saving || loadingCategories}
+                className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-700 px-4 py-3 text-sm font-semibold text-white disabled:opacity-50"
+              >
+                {saving && status === "published" ? (
+                  <LoaderCircle size={17} className="animate-spin" />
+                ) : (
+                  <Send size={17} />
+                )}
+                {isKhmer ? "ផ្សព្វផ្សាយ" : "Publish Article"}
+              </button>
+            </div>
+          </div>
+
+          {/* Right sidebar */}
+          <aside className="space-y-5 lg:sticky lg:top-[90px]">
+            {/* Publish panel */}
+            <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+              <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+                <h2 className="font-bold text-slate-900">
+                  {isKhmer ? "ការផ្សព្វផ្សាយ" : "Publish"}
+                </h2>
+
+                <Eye size={18} className="text-slate-400" />
+              </div>
+
+              <div className="space-y-5 p-5">
+                <div>
+                  <label
+                    htmlFor="category"
+                    className="mb-2 block text-sm font-semibold text-slate-700"
+                  >
+                    {isKhmer ? "ប្រភេទព័ត៌មាន" : "Category"}
+                  </label>
+
+                  <select
+                    id="category"
+                    value={form.category}
+                    onChange={(event) =>
+                      updateField("category", event.target.value)
+                    }
+                    disabled={loadingCategories || saving}
+                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100"
+                  >
+                    <option value="">
+                      {loadingCategories
+                        ? "Loading categories..."
+                        : "Select category"}
+                    </option>
+
+                    {categories.map((category) => (
+                      <option key={category.id} value={category.slug}>
+                        {isKhmer ? category.name_kh : category.name_en}
+                      </option>
+                    ))}
+                  </select>
+
+                  {!loadingCategories && categories.length === 0 && (
+                    <p className="mt-2 text-xs text-amber-700">
+                      No categories found. Create a category before publishing.
+                    </p>
+                  )}
+                </div>
+
+                <div className="rounded-lg bg-slate-50 p-4">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`h-2.5 w-2.5 rounded-full ${
+                        status === "published"
+                          ? "bg-green-500"
+                          : "bg-amber-500"
+                      }`}
                     />
 
-                    <div className="px-2 py-2">
-                      <p className="truncate text-xs text-slate-600">
-                        {image.file.name}
-                      </p>
-
-                      {index === 0 && (
-                        <span className="mt-1 inline-block text-xs font-medium text-blue-600">
-                          {isKhmer ? "រូបភាពដំបូង" : "First image"}
-                        </span>
-                      )}
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => removeImage(index)}
-                      aria-label={`Remove ${image.file.name}`}
-                      className="absolute right-2 top-2 rounded-full bg-white p-1.5 text-slate-700 shadow transition hover:bg-red-50 hover:text-red-600"
-                    >
-                      <X size={16} />
-                    </button>
+                    <span className="text-sm font-semibold text-slate-800">
+                      {status === "published" ? "Published" : "Draft"}
+                    </span>
                   </div>
-                ))}
+
+                  <p className="mt-2 text-xs leading-5 text-slate-500">
+                    {status === "published"
+                      ? "The article will be available on your public website."
+                      : "The article is saved as a draft until you publish it."}
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => void handleSave("draft")}
+                  disabled={saving || loadingCategories}
+                  className="flex w-full items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+                >
+                  {saving && status === "draft" ? (
+                    <LoaderCircle size={17} className="animate-spin" />
+                  ) : (
+                    <Save size={17} />
+                  )}
+                  Save as Draft
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={saving || loadingCategories}
+                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-700 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {saving && status === "published" ? (
+                    <LoaderCircle size={17} className="animate-spin" />
+                  ) : (
+                    <Send size={17} />
+                  )}
+                  Publish Article
+                </button>
               </div>
-            )}
-          </section>
+            </section>
 
-          {/* Actions */}
-          <div className="flex flex-col-reverse gap-3 border-t border-slate-200 pt-6 sm:flex-row sm:justify-end">
-            <button
-              type="button"
-              onClick={() => void handleSave("draft")}
-              disabled={saving || loadingCategories}
-              className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {saving && status === "draft" ? (
-                <LoaderCircle size={18} className="animate-spin" />
-              ) : (
-                <Save size={18} />
-              )}
+            {/* Article outline */}
+            <section className="rounded-xl border border-slate-200 bg-white shadow-sm">
+              <div className="flex items-center gap-2 border-b border-slate-200 px-5 py-4">
+                <FileText size={17} className="text-slate-500" />
 
-              {isKhmer ? "រក្សាទុកជាសេចក្តីព្រាង" : "Save as Draft"}
-            </button>
+                <h2 className="font-bold text-slate-900">
+                  Article Outline
+                </h2>
+              </div>
 
-            <button
-              type="submit"
-              disabled={saving || loadingCategories}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {saving && status === "published" ? (
-                <LoaderCircle size={18} className="animate-spin" />
-              ) : (
-                <Send size={18} />
-              )}
+              <div className="space-y-3 p-5">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                  English
+                </p>
 
-              {isKhmer ? "ផ្សព្វផ្សាយព័ត៌មាន" : "Publish News"}
-            </button>
-          </div>
+                {form.contentEn.replace(/<[^>]*>/g, " ").trim() ? (
+                  <p className="line-clamp-3 text-sm leading-6 text-slate-600">
+                    {form.contentEn
+                      .replace(/<[^>]*>/g, " ")
+                      .replace(/\s+/g, " ")
+                      .trim()}
+                  </p>
+                ) : (
+                  <p className="text-sm text-slate-400">
+                    Your article outline will appear here.
+                  </p>
+                )}
+
+                <div className="border-t border-slate-100 pt-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                    ខ្មែរ
+                  </p>
+
+                  {form.contentkh.replace(/<[^>]*>/g, " ").trim() ? (
+                    <p className="mt-2 line-clamp-3 text-sm leading-7 text-slate-600">
+                      {form.contentkh
+                        .replace(/<[^>]*>/g, " ")
+                        .replace(/\s+/g, " ")
+                        .trim()}
+                    </p>
+                  ) : (
+                    <p className="mt-2 text-sm text-slate-400">
+                      មាតិកាអត្ថបទនឹងបង្ហាញនៅទីនេះ។
+                    </p>
+                  )}
+                </div>
+              </div>
+            </section>
+
+            {/* Article information */}
+            <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex items-center gap-2">
+                <CalendarDays size={17} className="text-slate-500" />
+
+                <h2 className="font-bold text-slate-900">
+                  Article Information
+                </h2>
+              </div>
+
+              <div className="mt-4 space-y-3 text-sm">
+                <div className="flex justify-between gap-3">
+                  <span className="text-slate-500">Featured image</span>
+
+                  <span className="font-medium text-slate-800">
+                    {featuredImage ? "Selected" : "Not selected"}
+                  </span>
+                </div>
+
+                <div className="flex justify-between gap-3">
+                  <span className="text-slate-500">Additional images</span>
+
+                  <span className="font-medium text-slate-800">
+                    {additionalImages.length}
+                  </span>
+                </div>
+
+                <div className="flex justify-between gap-3">
+                  <span className="text-slate-500">English title</span>
+
+                  <span className="font-medium text-slate-800">
+                    {form.titleEn.trim() ? "Added" : "Empty"}
+                  </span>
+                </div>
+
+                <div className="flex justify-between gap-3">
+                  <span className="text-slate-500">Khmer title</span>
+
+                  <span className="font-medium text-slate-800">
+                    {form.titlekh.trim() ? "Added" : "Empty"}
+                  </span>
+                </div>
+              </div>
+            </section>
+          </aside>
         </form>
-      </div>
+      </main>
     </div>
   );
 }

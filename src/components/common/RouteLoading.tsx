@@ -6,7 +6,7 @@ interface RouteLoadingProps {
 }
 
 export default function RouteLoading({
-  message = "កំពុងផ្ទុក... / Loading...",
+  message = "កំពុងផ្ទុក...",
 }: RouteLoadingProps) {
   return (
     <div
