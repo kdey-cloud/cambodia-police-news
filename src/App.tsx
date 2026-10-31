@@ -19,6 +19,10 @@ import Background from "./pages/institution/Background";
 import RolesAndResponsibilities from "./pages/institution/RolesAndResponsibilities";
 import Strategic from "./pages/institution/Strategic";
 import CompositionAndLeadership from "./pages/structure/Composition-And-Leadership";
+import Directorate from "./pages/structure/Directorate"
+import PoliceScienceResearchInstitute from "./pages/structure/PoliceScienceResearchInstitute";
+import PostgraduateInstitute from "./pages/structure/PostgraduateInstitute";
+import InstituteOfPoliceProfessionalTraining from "./pages/structure/InstituteOfPoliceProfessionalTraining";
 
 import AdminLayout from "./layouts/AdminLayout";
 import AdminDashboard from "./pages/admin/AdminDashboard";
@@ -61,6 +65,26 @@ function PublicLayout() {
           <Route
             path="/pac-leadership"
             element={<CompositionAndLeadership />}
+          />
+
+          <Route
+            path="/directorate"
+            element={<Directorate/>}
+          />
+
+          <Route
+            path="/police-science-research-institute"
+            element={<PoliceScienceResearchInstitute/>}
+          />
+
+          <Route
+            path="/postgraduate-institute"
+            element={<PostgraduateInstitute/>}
+          />
+
+          <Route
+            path="/institute-of-police-professional-training"
+            element={<InstituteOfPoliceProfessionalTraining/>}
           />
         </Routes>
       </main>
