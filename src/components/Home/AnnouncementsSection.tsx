@@ -1,20 +1,21 @@
-
 import { useEffect, useState } from "react";
-import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
+import {
+  CalendarDays,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { supabase } from "../../lib/supabase";
 
-interface NewsArticle {
-  id: string;
-  title_kh: string | null;
-  title_en: string | null;
-  image_url: string | null;
-  published_at: string | null;
-  created_at: string;
+import type { FeaturedNews } from "../../types/news";
+
+interface AnnouncementsSectionProps {
+  featuredNews: FeaturedNews[];
 }
 
-export default function Hero() {
+export default function AnnouncementsSection({
+  featuredNews,
+}: AnnouncementsSectionProps) {
   const { i18n } = useTranslation();
 
   const language = (
@@ -25,67 +26,13 @@ export default function Hero() {
 
   const isKhmer = language.startsWith("kh") || language.startsWith("km");
 
-  const [featuredNews, setFeaturedNews] = useState<NewsArticle[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
   const [paused, setPaused] = useState(false);
-  const [loading, setLoading] = useState(true);
 
-  // Fetch pinned and published news, and measure request duration.
+  // Reset active slide when news changes.
   useEffect(() => {
-    let isMounted = true;
-
-    async function loadFeaturedNews() {
-      const startTime = performance.now();
-
-      try {
-        const { data, error } = await supabase
-          .from("news")
-          .select(
-            "id, title_kh, title_en, image_url, published_at, created_at",
-          )
-          .eq("status", "published")
-          .eq("is_pinned", true)
-          .order("published_at", {
-            ascending: false,
-            nullsFirst: false,
-          })
-          .order("created_at", { ascending: false })
-          .limit(3);
-
-        const elapsed = performance.now() - startTime;
-
-        console.log(
-          `[Featured News] Database request: ${elapsed.toFixed(0)} ms`,
-        );
-
-        if (!isMounted) return;
-
-        if (error) {
-          console.error("Failed to load featured news:", error.message);
-          setFeaturedNews([]);
-        } else {
-          setFeaturedNews(data ?? []);
-        }
-
-        setActiveIndex(0);
-      } catch (error) {
-        if (!isMounted) return;
-
-        console.error("Unexpected error loading featured news:", error);
-        setFeaturedNews([]);
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
-      }
-    }
-
-    loadFeaturedNews();
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+    setActiveIndex(0);
+  }, [featuredNews]);
 
   // Automatically change slides.
   useEffect(() => {
@@ -99,24 +46,35 @@ export default function Hero() {
   }, [paused, featuredNews.length]);
 
   const nextSlide = () => {
-    setActiveIndex((current) => (current + 1) % featuredNews.length);
+    setActiveIndex(
+      (current) => (current + 1) % featuredNews.length,
+    );
   };
 
   const previousSlide = () => {
     setActiveIndex(
-      (current) => (current - 1 + featuredNews.length) % featuredNews.length,
+      (current) =>
+        (current - 1 + featuredNews.length) % featuredNews.length,
     );
   };
 
-  function getTitle(article: NewsArticle) {
+  function getTitle(article: FeaturedNews) {
     if (isKhmer) {
-      return article.title_kh?.trim() || article.title_en?.trim() || "ព័ត៌មាន";
+      return (
+        article.title_kh?.trim() ||
+        article.title_en?.trim() ||
+        "ព័ត៌មាន"
+      );
     }
 
-    return article.title_en?.trim() || article.title_kh?.trim() || "News";
+    return (
+      article.title_en?.trim() ||
+      article.title_kh?.trim() ||
+      "News"
+    );
   }
 
-  function formatDate(article: NewsArticle) {
+  function formatDate(article: FeaturedNews) {
     const date = article.published_at || article.created_at;
 
     if (!date) return "";
@@ -130,20 +88,6 @@ export default function Hero() {
       month: "long",
       year: "numeric",
     }).format(parsedDate);
-  }
-
-  if (loading) {
-    return (
-      <section className="bg-slate-50 py-5 sm:py-7 md:py-9">
-        <div className="mx-auto max-w-7xl px-3 sm:px-5">
-          <div className="flex h-[300px] items-center justify-center rounded-xl bg-white shadow-sm sm:h-[380px] md:h-[430px]">
-            <p className="text-sm text-slate-500">
-              {isKhmer ? "កំពុងផ្ទុកព័ត៌មាន..." : "Loading news..."}
-            </p>
-          </div>
-        </div>
-      </section>
-    );
   }
 
   if (featuredNews.length === 0) {
@@ -165,6 +109,7 @@ export default function Hero() {
   return (
     <section className="bg-slate-50 py-5 sm:py-7 md:py-9">
       <div className="mx-auto max-w-7xl px-3 sm:px-5">
+
         {/* Announcement Heading */}
         <div className="mb-5 flex items-center gap-3">
           <div className="h-8 w-1 rounded-full bg-blue-900" />
@@ -190,7 +135,9 @@ export default function Hero() {
           onFocusCapture={() => setPaused(true)}
           onBlurCapture={(event) => {
             if (
-              !event.currentTarget.contains(event.relatedTarget as Node | null)
+              !event.currentTarget.contains(
+                event.relatedTarget as Node | null,
+              )
             ) {
               setPaused(false);
             }
@@ -277,7 +224,9 @@ export default function Hero() {
                     type="button"
                     onClick={() => setActiveIndex(index)}
                     aria-label={`Show news ${index + 1}`}
-                    aria-current={index === activeIndex ? "true" : undefined}
+                    aria-current={
+                      index === activeIndex ? "true" : undefined
+                    }
                     className={`h-2 rounded-full transition-all duration-300 ${
                       index === activeIndex
                         ? "w-7 bg-white"
@@ -330,4 +279,3 @@ export default function Hero() {
     </section>
   );
 }
-
