@@ -731,50 +731,115 @@ export default function NewsDetail() {
             )}
 
             {/* Photo Gallery */}
-            {galleryImages.length > 0 && (
-              <section className="mt-8">
-                <h2 className="mb-4 text-xl font-bold text-slate-900">
-                  {isKhmer ? "រូបភាពបន្ថែម" : "Photo Gallery"}
-                </h2>
+{galleryImages.length > 0 && (
+  <section className="mt-12">
+    {/* Gallery Heading */}
+    <div className="mb-6 flex items-end justify-between gap-4">
+      <div>
+        {/* <span className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-blue-700">
+          {isKhmer ? "រូបភាព" : "Media Gallery"}
+        </span>
 
-                <div className="grid grid-cols-12 gap-2 sm:gap-4">
-                  {galleryImages.map((image, index) => {
-                    const imageSize = normalizeDisplaySize(
-                      image.display_size,
-                    );
+        <h2 className="text-2xl font-extrabold tracking-tight text-slate-900">
+          {isKhmer ? "រូបភាពបន្ថែម" : "Photo Gallery"}
+        </h2> */}
 
-                    return (
-                      <figure
-                        key={image.id}
-                        className={`min-w-0 ${getGalleryColumnSize(
-                          imageSize,
-                        )}`}
-                      >
-                        <button
-                          type="button"
-                          onClick={() => setActiveImage(image.image_url)}
-                          className="group block aspect-square w-full cursor-zoom-in overflow-hidden rounded-lg bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-600"
-                          aria-label={
-                            isKhmer
-                              ? `មើលរូបភាពទី ${index + 1}`
-                              : `View gallery image ${index + 1}`
-                          }
-                        >
-                          <img
-                            src={image.image_url}
-                            alt={
-                              image.alt_text || `${title} - ${index + 1}`
-                            }
-                            loading="lazy"
-                            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                          />
-                        </button>
-                      </figure>
-                    );
-                  })}
-                </div>
-              </section>
-            )}
+        <p className="mt-2 text-sm leading-6 text-slate-500">
+          {isKhmer
+            ? "រូបភាពនៃសកម្មភាព និងព្រឹត្តិការណ៍ោ​ ៖"
+            : "Explore photos from this event and its activities."}
+        </p>
+      </div>
+
+      {/* Image Count */}
+      <span className="shrink-0 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-600">
+        {galleryImages.length} {isKhmer ? "រូបភាព" : "Photos"}
+      </span>
+    </div>
+
+    {/* Gallery Grid */}
+    <div className="grid grid-cols-12 gap-3 sm:gap-4">
+      {galleryImages.map((image, index) => {
+        const imageSize = normalizeDisplaySize(
+          image.display_size,
+        );
+
+        return (
+          <figure
+            key={image.id}
+            className={`
+              group relative min-w-0 overflow-hidden 
+              border border-slate-200/70 bg-slate-100
+              shadow-sm transition-all duration-300
+              hover:-translate-y-1 hover:shadow-lg
+              ${getGalleryColumnSize(imageSize)}
+            `}
+          >
+            <button
+              type="button"
+              onClick={() => setActiveImage(image.image_url)}
+              className="relative block aspect-[4/3] w-full cursor-zoom-in overflow-hidden focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-600"
+              aria-label={
+                isKhmer
+                  ? `មើលរូបភាពទី ${index + 1}`
+                  : `View gallery image ${index + 1}`
+              }
+            >
+              {/* Gallery Image */}
+              <img
+                src={image.image_url}
+                alt={
+                  image.alt_text ||
+                  `${title} - ${index + 1}`
+                }
+                loading="lazy"
+                className="
+                  h-full w-full object-cover
+                  transition-transform duration-500 ease-out
+                  group-hover:scale-105
+                "
+              />
+
+              {/* Dark Hover Overlay */}
+              <div className="
+                absolute inset-0
+                bg-gradient-to-t from-black/45 via-transparent to-transparent
+                opacity-0 transition-opacity duration-300
+                group-hover:opacity-100
+              " />
+
+              {/* Image Number */}
+              <span className="
+                absolute bottom-3 left-3
+                flex h-8 min-w-8 items-center justify-center
+                rounded-lg border border-white/30
+                bg-black/40 px-2 text-xs font-semibold text-white
+                opacity-0 backdrop-blur-sm
+                transition-all duration-300
+                group-hover:opacity-100
+              ">
+                {String(index + 1).padStart(2, "0")}
+              </span>
+
+              {/* Zoom Icon */}
+              <span className="
+                absolute right-3 top-3
+                flex h-9 w-9 items-center justify-center
+                rounded-full border border-white/30
+                bg-black/40 text-white backdrop-blur-sm
+                opacity-0 scale-90
+                transition-all duration-300
+                group-hover:scale-100 group-hover:opacity-100
+              ">
+                <ImageIcon size={17} />
+              </span>
+            </button>
+          </figure>
+        );
+      })}
+    </div>
+  </section>
+)}
 
             {/* Back to news */}
             <div className="mt-12 pt-6">
