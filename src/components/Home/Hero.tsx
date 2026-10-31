@@ -1,5 +1,6 @@
 import { useEffect } from "react";
-import { ArrowLeft, ArrowRight, ArrowUpRight } from "lucide-react";
+// import { ArrowLeft, ArrowRight } from "lucide-react";
+import { ArrowUpRight } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
@@ -95,7 +96,7 @@ export default function Hero() {
           {/* Buttons */}
           <div className="mt-4 flex flex-col gap-2 min-[380px]:flex-row sm:mt-5 sm:gap-3">
             <Link
-              to="/institution"
+              to="/institution/background"
               className={`group inline-flex min-h-9 items-center justify-center gap-2 bg-amber-400 px-4 py-2 text-xs font-bold text-blue-950 transition hover:bg-amber-300 sm:min-h-11 sm:px-5 sm:py-2.5 sm:text-sm ${
                 isKhmer ? "font-khmer" : "font-english"
               }`}
@@ -141,7 +142,7 @@ export default function Hero() {
       </div>
 
       {/* Desktop arrows */}
-      <div className="absolute bottom-5 right-5 hidden items-center gap-2 sm:flex xl:right-12">
+      {/* <div className="absolute bottom-5 right-5 hidden items-center gap-2 sm:flex xl:right-12">
         <button
           type="button"
           aria-label="Previous slide"
@@ -157,7 +158,7 @@ export default function Hero() {
         >
           <ArrowRight size={17} />
         </button>
-      </div>
+      </div> */}
     </section>
   );
 }

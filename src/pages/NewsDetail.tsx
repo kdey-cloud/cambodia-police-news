@@ -676,7 +676,7 @@ export default function NewsDetail() {
 
             {/* Featured Images */}
             {featuredImages.length > 0 && (
-              <section className="mt-8">
+              <section className="mt-4">
                 <div className="grid grid-cols-12 gap-2 sm:gap-4">
                   {featuredImages.map((image, index) => {
                     const imageSize = normalizeDisplaySize(
@@ -717,11 +717,7 @@ export default function NewsDetail() {
 
             {/* Formatted article content */}
             {showArticleContent && (
-              <section className="mt-10">
-                <h2 className="mb-5 text-xl font-bold text-slate-900">
-                  {isKhmer ? "ខ្លឹមសារព័ត៌មាន" : "Article"}
-                </h2>
-
+              <section className="mt-4">
                 <div
                   className="whitespace-pre-wrap break-words text-base leading-8 text-slate-700 sm:text-[17px]"
                   lang={isKhmer ? "kh" : "en"}
@@ -732,30 +728,9 @@ export default function NewsDetail() {
 
             {/* Photo Gallery */}
 {galleryImages.length > 0 && (
-  <section className="mt-12">
+  <section className="mt-4">
     {/* Gallery Heading */}
-    <div className="mb-6 flex items-end justify-between gap-4">
-      <div>
-        {/* <span className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-blue-700">
-          {isKhmer ? "រូបភាព" : "Media Gallery"}
-        </span>
-
-        <h2 className="text-2xl font-extrabold tracking-tight text-slate-900">
-          {isKhmer ? "រូបភាពបន្ថែម" : "Photo Gallery"}
-        </h2> */}
-
-        <p className="mt-2 text-sm leading-6 text-slate-500">
-          {isKhmer
-            ? "រូបភាពនៃសកម្មភាព និងព្រឹត្តិការណ៍ោ​ ៖"
-            : "Explore photos from this event and its activities."}
-        </p>
-      </div>
-
-      {/* Image Count */}
-      <span className="shrink-0 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-600">
-        {galleryImages.length} {isKhmer ? "រូបភាព" : "Photos"}
-      </span>
-    </div>
+    
 
     {/* Gallery Grid */}
     <div className="grid grid-cols-12 gap-3 sm:gap-4">
