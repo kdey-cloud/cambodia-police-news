@@ -65,12 +65,10 @@ async function trackNewsView(newsId: string): Promise<number | null> {
   const storageKey = `news-viewed-${newsId}`;
 
   try {
-    // Prevent counting the same article again in this session.
     if (sessionStorage.getItem(storageKey)) {
       return null;
     }
 
-    // Mark as viewed before calling Supabase.
     sessionStorage.setItem(storageKey, "true");
 
     const { error } = await supabase.rpc("increment_news_view", {
@@ -83,7 +81,6 @@ async function trackNewsView(newsId: string): Promise<number | null> {
       return null;
     }
 
-    // Fetch the latest view count after incrementing.
     const { data, error: countError } = await supabase
       .from("news")
       .select("view_count")
@@ -103,9 +100,7 @@ async function trackNewsView(newsId: string): Promise<number | null> {
   }
 }
 
-function normalizeDisplaySize(
-  size: string | null | undefined,
-): DisplaySize {
+function normalizeDisplaySize(size: string | null | undefined): DisplaySize {
   if (size === "medium" || size === "small") return size;
   return "large";
 }
@@ -133,7 +128,6 @@ function formatDate(dateString: string | null, language: string) {
 
 /**
  * Format view count using the current language.
- * Examples:
  * English: 4.0K
  * Khmer: ៤.០K
  */
@@ -190,9 +184,7 @@ function getContent(
  * Remove accidental Markdown image syntax and standalone image URLs.
  * Preserve real HTML images inserted through the rich-text editor.
  */
-function cleanArticleContent(
-  content: string | null | undefined,
-): string {
+function cleanArticleContent(content: string | null | undefined): string {
   if (!content) return "";
 
   return (
@@ -221,9 +213,7 @@ function cleanArticleContent(
 }
 
 /** Sanitize article HTML before rendering. */
-function sanitizeArticleContent(
-  content: string | null | undefined,
-): string {
+function sanitizeArticleContent(content: string | null | undefined): string {
   if (!content) return "";
 
   return DOMPurify.sanitize(content, {
@@ -254,12 +244,18 @@ function getCategoryLabel(category: string | null, isKhmer: boolean) {
   if (!category) return isKhmer ? "ព័ត៌មាន" : "News";
 
   const labels: Record<string, { en: string; kh: string }> = {
-    activities: { en: "Activities", kh: "សកម្មភាព" },
+    activities: {
+      en: "Activities",
+      kh: "សកម្មភាព",
+    },
     announcement: {
       en: "Announcement",
       kh: "សេចក្តីជូនដំណឹង",
     },
-    meeting: { en: "Meeting", kh: "កិច្ចប្រជុំ" },
+    meeting: {
+      en: "Meeting",
+      kh: "កិច្ចប្រជុំ",
+    },
   };
 
   const normalized = category.toLowerCase();
@@ -511,21 +507,21 @@ export default function NewsDetail() {
     setShowShareOptions(false);
   }
 
-  // Share article to Telegram.
+  // Share article to Telegram using the API Open Graph metadata.
+
   function shareToTelegram() {
     const shareUrl = window.location.href;
-    const shareTitle = article ? getTitle(article, isKhmer) : "News";
 
     const url = `https://t.me/share/url?url=${encodeURIComponent(
-      shareUrl,
-    )}&text=${encodeURIComponent(shareTitle)}`;
+      shareUrl
+    )}`;
 
-    window.open(url, "_blank", "width=600,height=500");
+    window.open(url, "_blank", "noopener,noreferrer");
 
     setShowShareOptions(false);
   }
 
-  // Copy article link.
+  // Copy the normal article link.
   async function copyLink() {
     try {
       await navigator.clipboard.writeText(window.location.href);
@@ -591,14 +587,11 @@ export default function NewsDetail() {
 
   const title = getTitle(article, isKhmer);
   const summary = getSummary(article, isKhmer);
-
   const rawContent = cleanArticleContent(getContent(article, isKhmer));
   const content = sanitizeArticleContent(rawContent);
   const showArticleContent = hasArticleContent(content);
 
-  const featuredImageSize = normalizeDisplaySize(
-    article.image_display_size,
-  );
+  const featuredImageSize = normalizeDisplaySize(article.image_display_size);
 
   const articleDate = formatDate(
     article.published_at || article.created_at,
@@ -606,7 +599,6 @@ export default function NewsDetail() {
   );
 
   const categoryLabel = getCategoryLabel(article.category, isKhmer);
-
   const viewCount = formatViewCount(article.view_count, isKhmer);
 
   // Featured images are displayed together as a static image group.
@@ -624,9 +616,7 @@ export default function NewsDetail() {
 
     ...images
       .filter(
-        (image) =>
-          image.is_featured &&
-          image.image_url !== article.image_url,
+        (image) => image.is_featured && image.image_url !== article.image_url,
       )
       .map((image) => ({
         id: image.id,
@@ -690,7 +680,6 @@ export default function NewsDetail() {
                 {/* News Views */}
                 <span className="inline-flex items-center gap-2 text-slate-500">
                   <Eye size={16} />
-
                   {isKhmer
                     ? `ចំនួនអ្នកទស្សនា ${viewCount} នាក់`
                     : ` ${viewCount} views`}
@@ -703,9 +692,7 @@ export default function NewsDetail() {
                 >
                   <button
                     type="button"
-                    onClick={() =>
-                      setShowShareOptions((previous) => !previous)
-                    }
+                    onClick={() => setShowShareOptions((previous) => !previous)}
                     aria-expanded={showShareOptions}
                     aria-haspopup="true"
                     className="inline-flex items-center gap-2 font-semibold text-slate-600 transition hover:text-blue-700"
@@ -717,9 +704,7 @@ export default function NewsDetail() {
                   {showShareOptions && (
                     <div className="absolute left-0 top-full z-50 mt-2 w-52 overflow-hidden rounded-xl border border-slate-200 bg-white p-2 shadow-xl">
                       <p className="px-3 py-2 text-xs font-bold uppercase tracking-wider text-slate-400">
-                        {isKhmer
-                          ? "ចែករំលែកទំព័រនេះ"
-                          : "Share this page"}
+                        {isKhmer ? "ចែករំលែកទំព័រនេះ" : "Share this page"}
                       </p>
 
                       <button
@@ -750,11 +735,7 @@ export default function NewsDetail() {
                         className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium text-slate-700 transition-colors duration-200 hover:bg-slate-100"
                       >
                         <span className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-600">
-                          {copied ? (
-                            <Check size={17} />
-                          ) : (
-                            <Copy size={17} />
-                          )}
+                          {copied ? <Check size={17} /> : <Copy size={17} />}
                         </span>
 
                         {copied
@@ -786,16 +767,12 @@ export default function NewsDetail() {
               <section className="mt-4">
                 <div className="grid grid-cols-12 gap-2 sm:gap-4">
                   {featuredImages.map((image, index) => {
-                    const imageSize = normalizeDisplaySize(
-                      image.display_size,
-                    );
+                    const imageSize = normalizeDisplaySize(image.display_size);
 
                     return (
                       <figure
                         key={image.id}
-                        className={`min-w-0 ${getGalleryColumnSize(
-                          imageSize,
-                        )}`}
+                        className={`min-w-0 ${getGalleryColumnSize(imageSize)}`}
                       >
                         <button
                           type="button"
@@ -838,9 +815,7 @@ export default function NewsDetail() {
               <section className="mt-4">
                 <div className="grid grid-cols-12 gap-3 sm:gap-4">
                   {galleryImages.map((image, index) => {
-                    const imageSize = normalizeDisplaySize(
-                      image.display_size,
-                    );
+                    const imageSize = normalizeDisplaySize(image.display_size);
 
                     return (
                       <figure
@@ -866,10 +841,7 @@ export default function NewsDetail() {
                           {/* Gallery Image */}
                           <img
                             src={image.image_url}
-                            alt={
-                              image.alt_text ||
-                              `${title} - ${index + 1}`
-                            }
+                            alt={image.alt_text || `${title} - ${index + 1}`}
                             loading="lazy"
                             className="
                               h-full w-full object-cover
@@ -942,10 +914,7 @@ export default function NewsDetail() {
             {/* Academy information */}
             <section className="pb-7">
               <div className="flex items-start gap-3">
-                <Shield
-                  size={26}
-                  className="mt-1 shrink-0 text-blue-700"
-                />
+                <Shield size={26} className="mt-1 shrink-0 text-blue-700" />
 
                 <div>
                   <h2 className="text-lg font-bold leading-7 text-slate-900">
@@ -955,9 +924,7 @@ export default function NewsDetail() {
                   </h2>
 
                   <p className="mt-1 text-sm text-slate-500">
-                    {isKhmer
-                      ? "ព័ត៌មាន និងសកម្មភាព"
-                      : "News and Activities"}
+                    {isKhmer ? "ព័ត៌មាន និងសកម្មភាព" : "News and Activities"}
                   </p>
                 </div>
               </div>
@@ -987,12 +954,8 @@ export default function NewsDetail() {
                 <div>
                   {recentNews.map((item) => {
                     const recentTitle = isKhmer
-                      ? item.title_kh?.trim() ||
-                        item.title_en?.trim() ||
-                        ""
-                      : item.title_en?.trim() ||
-                        item.title_kh?.trim() ||
-                        "";
+                      ? item.title_kh?.trim() || item.title_en?.trim() || ""
+                      : item.title_en?.trim() || item.title_kh?.trim() || "";
 
                     return (
                       <Link
@@ -1009,10 +972,7 @@ export default function NewsDetail() {
                               className="h-full w-full object-contain"
                             />
                           ) : (
-                            <ImageIcon
-                              size={23}
-                              className="text-slate-400"
-                            />
+                            <ImageIcon size={23} className="text-slate-400" />
                           )}
                         </div>
 
@@ -1027,7 +987,6 @@ export default function NewsDetail() {
 
                           <p className="mt-2 flex items-center gap-1 text-xs text-slate-400">
                             <CalendarDays size={12} />
-
                             {formatDate(
                               item.published_at || item.created_at,
                               i18n.language,
