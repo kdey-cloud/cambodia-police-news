@@ -6,6 +6,7 @@ import {
   ArrowLeft,
   ArrowRight,
   CalendarDays,
+  Eye,
   Image as ImageIcon,
   LoaderCircle,
   Share2,
@@ -33,6 +34,7 @@ type NewsArticle = {
   status: string;
   published_at: string | null;
   created_at: string;
+  view_count: number;
 };
 
 type NewsImage = {
@@ -55,6 +57,52 @@ type RecentArticle = {
   created_at: string;
 };
 
+/**
+ * Count one view per article per browser session.
+ * Return the updated view count after a successful increment.
+ */
+async function trackNewsView(newsId: string): Promise<number | null> {
+  const storageKey = `news-viewed-${newsId}`;
+
+  try {
+    // Prevent counting the same article again in this session.
+    if (sessionStorage.getItem(storageKey)) {
+      return null;
+    }
+
+    // Mark as viewed before calling Supabase.
+    sessionStorage.setItem(storageKey, "true");
+
+    const { error } = await supabase.rpc("increment_news_view", {
+      p_news_id: newsId,
+    });
+
+    if (error) {
+      console.error("News view tracking failed:", error);
+      sessionStorage.removeItem(storageKey);
+      return null;
+    }
+
+    // Fetch the latest view count after incrementing.
+    const { data, error: countError } = await supabase
+      .from("news")
+      .select("view_count")
+      .eq("id", newsId)
+      .eq("status", "published")
+      .maybeSingle();
+
+    if (countError) {
+      console.error("Unable to refresh news view count:", countError);
+      return null;
+    }
+
+    return Number(data?.view_count ?? 0);
+  } catch (error) {
+    console.error("News view tracking error:", error);
+    return null;
+  }
+}
+
 function normalizeDisplaySize(
   size: string | null | undefined,
 ): DisplaySize {
@@ -76,10 +124,33 @@ function formatDate(dateString: string | null, language: string) {
       : "en-GB";
 
   return new Intl.DateTimeFormat(locale, {
+    weekday: "long",
     year: "numeric",
     month: "long",
     day: "numeric",
   }).format(date);
+}
+
+/**
+ * Format view count using the current language.
+ * Examples:
+ * English: 4.0K
+ * Khmer: ៤.០K
+ */
+function formatViewCount(count: number, isKhmer: boolean) {
+  const locale = isKhmer ? "km-KH" : "en-GB";
+  const safeCount = Math.max(0, Number(count) || 0);
+
+  if (safeCount >= 1000) {
+    const value = (safeCount / 1000).toFixed(1);
+
+    return `${Number(value).toLocaleString(locale, {
+      minimumFractionDigits: 1,
+      maximumFractionDigits: 1,
+    })}K`;
+  }
+
+  return safeCount.toLocaleString(locale);
 }
 
 function getTitle(
@@ -119,7 +190,9 @@ function getContent(
  * Remove accidental Markdown image syntax and standalone image URLs.
  * Preserve real HTML images inserted through the rich-text editor.
  */
-function cleanArticleContent(content: string | null | undefined): string {
+function cleanArticleContent(
+  content: string | null | undefined,
+): string {
   if (!content) return "";
 
   return (
@@ -148,7 +221,9 @@ function cleanArticleContent(content: string | null | undefined): string {
 }
 
 /** Sanitize article HTML before rendering. */
-function sanitizeArticleContent(content: string | null | undefined): string {
+function sanitizeArticleContent(
+  content: string | null | undefined,
+): string {
   if (!content) return "";
 
   return DOMPurify.sanitize(content, {
@@ -180,7 +255,10 @@ function getCategoryLabel(category: string | null, isKhmer: boolean) {
 
   const labels: Record<string, { en: string; kh: string }> = {
     activities: { en: "Activities", kh: "សកម្មភាព" },
-    announcement: { en: "Announcement", kh: "សេចក្តីជូនដំណឹង" },
+    announcement: {
+      en: "Announcement",
+      kh: "សេចក្តីជូនដំណឹង",
+    },
     meeting: { en: "Meeting", kh: "កិច្ចប្រជុំ" },
   };
 
@@ -275,7 +353,7 @@ export default function NewsDetail() {
       const { data: articleData, error: articleError } = await supabase
         .from("news")
         .select(
-          "id, title_kh, title_en, summary_kh, summary_en, content_kh, content_en, image_url, image_display_size, category, status, published_at, created_at",
+          "id, title_kh, title_en, summary_kh, summary_en, content_kh, content_en, image_url, image_display_size, category, status, published_at, created_at, view_count",
         )
         .eq("id", id)
         .eq("status", "published")
@@ -307,9 +385,26 @@ export default function NewsDetail() {
         return;
       }
 
-      const currentArticle = articleData as NewsArticle;
+      const currentArticle = {
+        ...articleData,
+        view_count: Number(articleData.view_count ?? 0),
+      } as NewsArticle;
 
       setArticle(currentArticle);
+
+      // Count this article's view and update the displayed count.
+      void trackNewsView(currentArticle.id).then((updatedViewCount) => {
+        if (!active || updatedViewCount === null) return;
+
+        setArticle((previous) =>
+          previous?.id === currentArticle.id
+            ? {
+                ...previous,
+                view_count: updatedViewCount,
+              }
+            : previous,
+        );
+      });
 
       const { data: imageData, error: imageError } = await supabase
         .from("news_images")
@@ -362,7 +457,6 @@ export default function NewsDetail() {
           "id, title_kh, title_en, image_url, category, published_at, created_at",
         )
         .eq("status", "published")
-        // Sort by creation date so newly added articles appear first.
         .order("created_at", { ascending: false })
         .limit(7);
 
@@ -513,8 +607,9 @@ export default function NewsDetail() {
 
   const categoryLabel = getCategoryLabel(article.category, isKhmer);
 
+  const viewCount = formatViewCount(article.view_count, isKhmer);
+
   // Featured images are displayed together as a static image group.
-  // Each image respects its own selected display size.
   const featuredImages = [
     ...(article.image_url
       ? [
@@ -575,7 +670,7 @@ export default function NewsDetail() {
           <article className="min-w-0 lg:col-span-8">
             {/* Title and summary */}
             <header>
-              {/* Category, date and share dropdown */}
+              {/* Category, date, views and share dropdown */}
               <div className="mb-5 flex flex-wrap items-center gap-x-4 gap-y-3 text-sm">
                 <span className="inline-flex items-center gap-2 font-semibold text-blue-700">
                   <Tag size={15} />
@@ -584,9 +679,21 @@ export default function NewsDetail() {
 
                 <span className="text-slate-300">|</span>
 
+                {/* Publication Date */}
                 <span className="inline-flex items-center gap-2 text-slate-500">
                   <CalendarDays size={15} />
                   {articleDate}
+                </span>
+
+                <span className="text-slate-300">|</span>
+
+                {/* News Views */}
+                <span className="inline-flex items-center gap-2 text-slate-500">
+                  <Eye size={16} />
+
+                  {isKhmer
+                    ? `ចំនួនអ្នកទស្សនា ${viewCount}`
+                    : `${viewCount} views`}
                 </span>
 
                 {/* Share dropdown */}
@@ -727,94 +834,96 @@ export default function NewsDetail() {
             )}
 
             {/* Photo Gallery */}
-{galleryImages.length > 0 && (
-  <section className="mt-4">
-    {/* Gallery Heading */}
-    
+            {galleryImages.length > 0 && (
+              <section className="mt-4">
+                <div className="grid grid-cols-12 gap-3 sm:gap-4">
+                  {galleryImages.map((image, index) => {
+                    const imageSize = normalizeDisplaySize(
+                      image.display_size,
+                    );
 
-    {/* Gallery Grid */}
-    <div className="grid grid-cols-12 gap-3 sm:gap-4">
-      {galleryImages.map((image, index) => {
-        const imageSize = normalizeDisplaySize(
-          image.display_size,
-        );
+                    return (
+                      <figure
+                        key={image.id}
+                        className={`
+                          group relative min-w-0 overflow-hidden
+                          border border-slate-200/70 bg-slate-100
+                          shadow-sm transition-all duration-300
+                          hover:-translate-y-1 hover:shadow-lg
+                          ${getGalleryColumnSize(imageSize)}
+                        `}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => setActiveImage(image.image_url)}
+                          className="relative block aspect-[4/3] w-full cursor-zoom-in overflow-hidden focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-600"
+                          aria-label={
+                            isKhmer
+                              ? `មើលរូបភាពទី ${index + 1}`
+                              : `View gallery image ${index + 1}`
+                          }
+                        >
+                          {/* Gallery Image */}
+                          <img
+                            src={image.image_url}
+                            alt={
+                              image.alt_text ||
+                              `${title} - ${index + 1}`
+                            }
+                            loading="lazy"
+                            className="
+                              h-full w-full object-cover
+                              transition-transform duration-500 ease-out
+                              group-hover:scale-105
+                            "
+                          />
 
-        return (
-          <figure
-            key={image.id}
-            className={`
-              group relative min-w-0 overflow-hidden 
-              border border-slate-200/70 bg-slate-100
-              shadow-sm transition-all duration-300
-              hover:-translate-y-1 hover:shadow-lg
-              ${getGalleryColumnSize(imageSize)}
-            `}
-          >
-            <button
-              type="button"
-              onClick={() => setActiveImage(image.image_url)}
-              className="relative block aspect-[4/3] w-full cursor-zoom-in overflow-hidden focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-600"
-              aria-label={
-                isKhmer
-                  ? `មើលរូបភាពទី ${index + 1}`
-                  : `View gallery image ${index + 1}`
-              }
-            >
-              {/* Gallery Image */}
-              <img
-                src={image.image_url}
-                alt={
-                  image.alt_text ||
-                  `${title} - ${index + 1}`
-                }
-                loading="lazy"
-                className="
-                  h-full w-full object-cover
-                  transition-transform duration-500 ease-out
-                  group-hover:scale-105
-                "
-              />
+                          {/* Dark Hover Overlay */}
+                          <div
+                            className="
+                              absolute inset-0
+                              bg-gradient-to-t from-black/45 via-transparent to-transparent
+                              opacity-0 transition-opacity duration-300
+                              group-hover:opacity-100
+                            "
+                          />
 
-              {/* Dark Hover Overlay */}
-              <div className="
-                absolute inset-0
-                bg-gradient-to-t from-black/45 via-transparent to-transparent
-                opacity-0 transition-opacity duration-300
-                group-hover:opacity-100
-              " />
+                          {/* Image Number */}
+                          <span
+                            className="
+                              absolute bottom-3 left-3
+                              flex h-8 min-w-8 items-center justify-center
+                              rounded-lg border border-white/30
+                              bg-black/40 px-2 text-xs font-semibold text-white
+                              opacity-0 backdrop-blur-sm
+                              transition-all duration-300
+                              group-hover:opacity-100
+                            "
+                          >
+                            {String(index + 1).padStart(2, "0")}
+                          </span>
 
-              {/* Image Number */}
-              <span className="
-                absolute bottom-3 left-3
-                flex h-8 min-w-8 items-center justify-center
-                rounded-lg border border-white/30
-                bg-black/40 px-2 text-xs font-semibold text-white
-                opacity-0 backdrop-blur-sm
-                transition-all duration-300
-                group-hover:opacity-100
-              ">
-                {String(index + 1).padStart(2, "0")}
-              </span>
-
-              {/* Zoom Icon */}
-              <span className="
-                absolute right-3 top-3
-                flex h-9 w-9 items-center justify-center
-                rounded-full border border-white/30
-                bg-black/40 text-white backdrop-blur-sm
-                opacity-0 scale-90
-                transition-all duration-300
-                group-hover:scale-100 group-hover:opacity-100
-              ">
-                <ImageIcon size={17} />
-              </span>
-            </button>
-          </figure>
-        );
-      })}
-    </div>
-  </section>
-)}
+                          {/* Zoom Icon */}
+                          <span
+                            className="
+                              absolute right-3 top-3
+                              flex h-9 w-9 items-center justify-center
+                              rounded-full border border-white/30
+                              bg-black/40 text-white backdrop-blur-sm
+                              opacity-0 scale-90
+                              transition-all duration-300
+                              group-hover:scale-100 group-hover:opacity-100
+                            "
+                          >
+                            <ImageIcon size={17} />
+                          </span>
+                        </button>
+                      </figure>
+                    );
+                  })}
+                </div>
+              </section>
+            )}
 
             {/* Back to news */}
             <div className="mt-12 pt-6">
@@ -878,8 +987,12 @@ export default function NewsDetail() {
                 <div>
                   {recentNews.map((item) => {
                     const recentTitle = isKhmer
-                      ? item.title_kh?.trim() || item.title_en?.trim() || ""
-                      : item.title_en?.trim() || item.title_kh?.trim() || "";
+                      ? item.title_kh?.trim() ||
+                        item.title_en?.trim() ||
+                        ""
+                      : item.title_en?.trim() ||
+                        item.title_kh?.trim() ||
+                        "";
 
                     return (
                       <Link

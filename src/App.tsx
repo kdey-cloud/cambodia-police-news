@@ -33,49 +33,36 @@ import CreateNews from "./pages/admin/CreateNews";
 import Categories from "./pages/admin/Categories";
 import MediaLibrary from "./pages/admin/MediaLibrary";
 import EditNews from "./pages/admin/EditNews";
-/* =========================================
-TYPES
-========================================= */
 
-export interface FeaturedNews {
-id: string;
-title_kh: string | null;
-title_en: string | null;
-image_url: string | null;
-published_at: string | null;
-created_at: string;
-}
+import type { FeaturedNews } from "./types/news";
 
 /* =========================================
 IMAGE PRELOADING
 ========================================= */
 
 function preloadImage(url: string): Promise<void> {
-return new Promise((resolve) => {
-const image = new Image();
-let finished = false;
+  return new Promise((resolve) => {
+    const image = new Image();
+    let finished = false;
 
+    const finish = () => {
+      if (finished) return;
 
-const finish = () => {
-  if (finished) return;
+      finished = true;
+      window.clearTimeout(timeout);
+      resolve();
+    };
 
-  finished = true;
-  window.clearTimeout(timeout);
-  resolve();
-};
+    const timeout = window.setTimeout(finish, 3000);
 
-const timeout = window.setTimeout(finish, 3000);
+    image.onload = finish;
+    image.onerror = finish;
+    image.src = url;
 
-image.onload = finish;
-image.onerror = finish;
-image.src = url;
-
-if (image.complete) {
-  finish();
-}
-
-
-});
+    if (image.complete) {
+      finish();
+    }
+  });
 }
 
 /* =========================================
@@ -83,70 +70,66 @@ PUBLIC LAYOUT
 ========================================= */
 
 interface PublicLayoutProps {
-featuredNews: FeaturedNews[];
+  featuredNews: FeaturedNews[];
 }
 
 function PublicLayout({ featuredNews }: PublicLayoutProps) {
-return ( <div className="flex min-h-screen flex-col"> <ScrollToTop />
+  return (
+    <div className="flex min-h-screen flex-col">
+      <ScrollToTop />
 
+      <Navbar />
 
-  <Navbar />
+      <main className="flex-1">
+        <Routes>
+          {/* Homepage */}
+          <Route path="/" element={<Home featuredNews={featuredNews} />} />
 
-  <main className="flex-1">
-    <Routes>
-      <Route
-        path="/"
-        element={<Home featuredNews={featuredNews} />}
-      />
+          {/* News */}
+          <Route path="/news" element={<News />} />
 
-      <Route path="/news" element={<News />} />
-      <Route path="/news/:id" element={<NewsDetail />} />
-      <Route path="/search" element={<Search />} />
+          <Route path="/news/:id" element={<NewsDetail />} />
 
-      <Route
-        path="/institution/background"
-        element={<Background />}
-      />
+          <Route path="/search" element={<Search />} />
 
-      <Route
-        path="/institution/roles-and-responsibilities"
-        element={<RolesAndResponsibilities />}
-      />
+          {/* Institution */}
+          <Route path="/institution/background" element={<Background />} />
 
-      <Route
-        path="/institution/strategy"
-        element={<Strategic />}
-      />
+          <Route
+            path="/institution/roles-and-responsibilities"
+            element={<RolesAndResponsibilities />}
+          />
 
-      <Route
-        path="/pac-leadership"
-        element={<CompositionAndLeadership />}
-      />
+          <Route path="/institution/strategy" element={<Strategic />} />
 
-      <Route path="/directorate" element={<Directorate />} />
+          {/* Structure */}
+          <Route
+            path="/pac-leadership"
+            element={<CompositionAndLeadership />}
+          />
 
-      <Route
-        path="/police-science-research-institute"
-        element={<PoliceScienceResearchInstitute />}
-      />
+          <Route path="/directorate" element={<Directorate />} />
 
-      <Route
-        path="/postgraduate-institute"
-        element={<PostgraduateInstitute />}
-      />
+          <Route
+            path="/police-science-research-institute"
+            element={<PoliceScienceResearchInstitute />}
+          />
 
-      <Route
-        path="/institute-of-police-professional-training"
-        element={<InstituteOfPoliceProfessionalTraining />}
-      />
-    </Routes>
-  </main>
+          <Route
+            path="/postgraduate-institute"
+            element={<PostgraduateInstitute />}
+          />
 
-  <Footer />
-</div>
+          <Route
+            path="/institute-of-police-professional-training"
+            element={<InstituteOfPoliceProfessionalTraining />}
+          />
+        </Routes>
+      </main>
 
-
-);
+      <Footer />
+    </div>
+  );
 }
 
 /* =========================================
@@ -154,80 +137,83 @@ PUBLIC WEBSITE LOADER
 ========================================= */
 
 function PublicWebsite() {
-const [isLoading, setIsLoading] = useState(true);
-const [featuredNews, setFeaturedNews] = useState<FeaturedNews[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [featuredNews, setFeaturedNews] = useState<FeaturedNews[]>([]);
 
-useEffect(() => {
-let mounted = true;
+  useEffect(() => {
+    let mounted = true;
 
+    async function initializeWebsite() {
+      const startTime = performance.now();
 
-async function initializeWebsite() {
-  const startTime = performance.now();
+      try {
+        const { data, error } = await supabase
+          .from("news")
+          .select("id, title_kh, title_en, image_url, published_at, created_at")
+          .eq("status", "published")
+          .eq("is_pinned", true)
+          .order("published_at", {
+            ascending: false,
+            nullsFirst: false,
+          })
+          .order("created_at", {
+            ascending: false,
+          })
+          .limit(3);
 
-  try {
-    const { data, error } = await supabase
-      .from("news")
-      .select(
-        "id, title_kh, title_en, image_url, published_at, created_at",
-      )
-      .eq("status", "published")
-      .eq("is_pinned", true)
-      .order("published_at", {
-        ascending: false,
-        nullsFirst: false,
-      })
-      .order("created_at", {
-        ascending: false,
-      })
-      .limit(3);
+        if (error) throw error;
 
-    if (error) throw error;
+        const news = (data ?? []) as FeaturedNews[];
 
-    const news = (data ?? []) as FeaturedNews[];
+        if (!mounted) return;
 
-    if (!mounted) return;
+        setFeaturedNews(news);
 
-    setFeaturedNews(news);
+        console.log(
+          `[Featured News] Supabase: ${(performance.now() - startTime).toFixed(
+            0,
+          )} ms`,
+        );
 
-    console.log(
-      `[Featured News] Supabase: ${(
-        performance.now() - startTime
-      ).toFixed(0)} ms`,
-    );
+        // Preload all pinned news images in parallel.
+        await Promise.all(
+          news
+            .map((article) => article.image_url)
+            .filter((url): url is string => Boolean(url))
+            .map(preloadImage),
+        );
 
-    // Preload all pinned news images in parallel.
-    await Promise.all(
-      news
-        .map((article) => article.image_url)
-        .filter((url): url is string => Boolean(url))
-        .map(preloadImage),
-    );
+        console.log("[Featured News] Images ready.");
+      } catch (error) {
+        console.error("[Featured News] Loading failed:", error);
+      } finally {
+        if (mounted) {
+          setIsLoading(false);
+        }
+      }
+      // Wait until website fonts are fully loaded.
+      await Promise.all([
+        document.fonts.load('16px "Battambang"'),
+        document.fonts.load('16px "Inter"'),
+      ]);
 
-    console.log("[Featured News] Images ready.");
-  } catch (error) {
-    console.error("[Featured News] Loading failed:", error);
-  } finally {
-    if (mounted) {
-      setIsLoading(false);
+      await document.fonts.ready;
     }
+
+    initializeWebsite();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  if (isLoading) {
+    return (
+      <LoadingScreen message="កំពុងផ្ទុកព័ត៌មានសំខាន់ៗ... / Loading featured news..." />
+    );
   }
-}
 
-initializeWebsite();
-
-return () => {
-  mounted = false;
-};
-
-
-}, []);
-
-if (isLoading) {
-return ( <LoadingScreen message="កំពុងផ្ទុកព័ត៌មានសំខាន់ៗ... / Loading featured news..." />
-);
-}
-
-return <PublicLayout featuredNews={featuredNews} />;
+  return <PublicLayout featuredNews={featuredNews} />;
 }
 
 /* =========================================
@@ -235,33 +221,37 @@ MAIN APP
 ========================================= */
 
 export default function App() {
-return ( <Routes>
-{/* Admin login */}
-<Route path="/admin/login" element={<AdminLogin />} />
+  return (
+    <Routes>
+      {/* Admin login */}
+      <Route path="/admin/login" element={<AdminLogin />} />
 
+      {/* Admin pages */}
+      <Route
+        path="/admin"
+        element={
+          <AdminProtectedRoute>
+            <AdminLayout />
+          </AdminProtectedRoute>
+        }
+      >
+        <Route index element={<AdminDashboard />} />
 
-  {/* Admin pages */}
-  <Route
-    path="/admin"
-    element={
-      <AdminProtectedRoute>
-        <AdminLayout />
-      </AdminProtectedRoute>
-    }
-  >
-    <Route index element={<AdminDashboard />} />
-    <Route path="dashboard" element={<AdminDashboard />} />
-    <Route path="news" element={<ManageNews />} />
-    <Route path="news/edit/:id" element={<EditNews />} />
-    <Route path="news/create" element={<CreateNews />} />
-    <Route path="categories" element={<Categories />} />
-    <Route path="media" element={<MediaLibrary />} />
-  </Route>
+        <Route path="dashboard" element={<AdminDashboard />} />
 
-  {/* Public website */}
-  <Route path="/*" element={<PublicWebsite />} />
-</Routes>
+        <Route path="news" element={<ManageNews />} />
 
+        <Route path="news/edit/:id" element={<EditNews />} />
 
-);
+        <Route path="news/create" element={<CreateNews />} />
+
+        <Route path="categories" element={<Categories />} />
+
+        <Route path="media" element={<MediaLibrary />} />
+      </Route>
+
+      {/* Public website */}
+      <Route path="/*" element={<PublicWebsite />} />
+    </Routes>
+  );
 }
