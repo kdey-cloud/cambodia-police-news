@@ -74,17 +74,17 @@ function preloadImage(url: string): Promise<void> {
 ========================================= */
 
 async function preloadFonts() {
-  try {
-    await Promise.all([
-      document.fonts.load('400 16px "Inter"'),
-      document.fonts.load('400 16px "Battambang"'),
-      document.fonts.load('400 16px "Moul"'),
-    ]);
+  const khmerText = "បណ្ឌិត្យសភានគរបាលកម្ពុជា";
 
-    await document.fonts.ready;
-  } catch (error) {
-    console.error("[Fonts] Loading failed:", error);
-  }
+  await Promise.all([
+    document.fonts.load('400 16px "Inter"'),
+    document.fonts.load('800 32px "Inter"'),
+    document.fonts.load('400 16px "Battambang"', khmerText),
+    document.fonts.load('700 16px "Battambang"', khmerText),
+    document.fonts.load('400 32px "Moul"', khmerText),
+  ]);
+
+  await document.fonts.ready;
 }
 
 /* =========================================
