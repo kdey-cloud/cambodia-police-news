@@ -38,10 +38,12 @@ export default async function handler(req, res) {
       article.summary_kh ||
       "Official news from the Police Academy of Cambodia.";
 
-    const image =
-      article.image_url || "https://YOUR-DOMAIN.vercel.app/share-image.jpg";
+const image =
+  article.image_url ||
+  "https://cambodia-police-news.vercel.app/share-image.jpg";
 
-    const articleUrl = `https://YOUR-DOMAIN.vercel.app/news/${article.id}`;
+const articleUrl =
+  `https://cambodia-police-news.vercel.app/news/${article.id}`;
 
     const escapeHTML = (value) =>
       String(value)
