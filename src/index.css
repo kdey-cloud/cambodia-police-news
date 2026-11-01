@@ -1,4 +1,31 @@
+@import url("https://fonts.googleapis.com/css2?family=Battambang:wght@400;700&family=Inter:wght@400;500;600;700;800&family=Moul&display=swap");
+
 @import "tailwindcss";
+
+/* ================================
+Original Font Configuration
+================================ */
+
+html[lang="en"] body {
+font-family: "Inter", "Battambang", sans-serif;
+}
+
+html[lang="kh"] body {
+font-family: "Battambang", sans-serif;
+}
+
+.font-khmer {
+font-family: "Battambang", sans-serif !important;
+}
+
+.font-english {
+font-family: "Inter", sans-serif !important;
+}
+
+.font-moul {
+font-family: "Moul", serif !important;
+font-weight: 400;
+}
 
 /* ========================================
 GLOBAL RESET
