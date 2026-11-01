@@ -5,26 +5,30 @@
 /* ================================
 Original Font Configuration
 ================================ */
+@import "tailwindcss";
 
+/* English */
 html[lang="en"] body {
-font-family: "Inter", "Battambang", sans-serif;
+  font-family: "Inter", "Battambang", sans-serif;
 }
 
+/* Khmer */
 html[lang="kh"] body {
-font-family: "Battambang", sans-serif;
+  font-family: "Battambang", sans-serif;
 }
 
+/* Font utilities */
 .font-khmer {
-font-family: "Battambang", sans-serif !important;
+  font-family: "Battambang", sans-serif !important;
 }
 
 .font-english {
-font-family: "Inter", sans-serif !important;
+  font-family: "Inter", sans-serif !important;
 }
 
 .font-moul {
-font-family: "Moul", serif !important;
-font-weight: 400;
+  font-family: "Moul", serif !important;
+  font-weight: 400;
 }
 
 /* ========================================
