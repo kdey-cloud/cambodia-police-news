@@ -13,7 +13,7 @@ export default function Hero() {
     "en"
   ).toLowerCase();
 
-  const isKhmer = language.startsWith("kh") || language.startsWith("kh");
+  const isKhmer = language.startsWith("kh");
 
   useEffect(() => {
     document.documentElement.lang = isKhmer ? "kh" : "en";
@@ -28,15 +28,14 @@ export default function Hero() {
       "
     >
       {/* Background image */}
-
-      <div className="absolute inset-0 -z-20">
+      <div className="absolute inset-0 -z-20 overflow-hidden">
         <img
           src="/hero-academy.jpg"
           alt=""
-          className="
-      h-full w-full object-cover object-center
-      [mask-image:linear-gradient(to_bottom,black_calc(10%-20px),transparent_100%)]
-    "
+          fetchPriority="high"
+          decoding="async"
+          draggable={false}
+          className="hero-background-image object-cover object-center"
         />
       </div>
 

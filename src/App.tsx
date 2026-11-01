@@ -37,26 +37,30 @@ import EditNews from "./pages/admin/EditNews";
 import type { FeaturedNews } from "./types/news";
 
 /* =========================================
-IMAGE PRELOADING
+   IMAGE PRELOADING
 ========================================= */
 
 function preloadImage(url: string): Promise<void> {
   return new Promise((resolve) => {
     const image = new Image();
+
     let finished = false;
 
     const finish = () => {
       if (finished) return;
 
       finished = true;
+
       window.clearTimeout(timeout);
+
       resolve();
     };
 
-    const timeout = window.setTimeout(finish, 3000);
+    const timeout = window.setTimeout(finish, 5000);
 
     image.onload = finish;
     image.onerror = finish;
+
     image.src = url;
 
     if (image.complete) {
@@ -66,7 +70,25 @@ function preloadImage(url: string): Promise<void> {
 }
 
 /* =========================================
-PUBLIC LAYOUT
+   FONT PRELOADING
+========================================= */
+
+async function preloadFonts() {
+  try {
+    await Promise.all([
+      document.fonts.load('400 16px "Inter"'),
+      document.fonts.load('400 16px "Battambang"'),
+      document.fonts.load('400 16px "Moul"'),
+    ]);
+
+    await document.fonts.ready;
+  } catch (error) {
+    console.error("[Fonts] Loading failed:", error);
+  }
+}
+
+/* =========================================
+   PUBLIC LAYOUT
 ========================================= */
 
 interface PublicLayoutProps {
@@ -133,11 +155,12 @@ function PublicLayout({ featuredNews }: PublicLayoutProps) {
 }
 
 /* =========================================
-PUBLIC WEBSITE LOADER
+   PUBLIC WEBSITE LOADER
 ========================================= */
 
 function PublicWebsite() {
   const [isLoading, setIsLoading] = useState(true);
+
   const [featuredNews, setFeaturedNews] = useState<FeaturedNews[]>([]);
 
   useEffect(() => {
@@ -147,6 +170,16 @@ function PublicWebsite() {
       const startTime = performance.now();
 
       try {
+        /*
+         * 1. Load homepage Hero image and fonts.
+         */
+        const heroImagePromise = preloadImage("/hero-academy.jpg");
+
+        const fontsPromise = preloadFonts();
+
+        /*
+         * 2. Fetch featured news.
+         */
         const { data, error } = await supabase
           .from("news")
           .select("id, title_kh, title_en, image_url, published_at, created_at")
@@ -170,34 +203,50 @@ function PublicWebsite() {
         setFeaturedNews(news);
 
         console.log(
-          `[Featured News] Supabase: ${(performance.now() - startTime).toFixed(
-            0,
-          )} ms`,
+          `[Featured News] Supabase: ${(
+            performance.now() - startTime
+          ).toFixed(0)} ms`,
         );
 
-        // Preload all pinned news images in parallel.
-        await Promise.all(
+        /*
+         * 3. Preload featured news images.
+         */
+        const newsImagesPromise = Promise.all(
           news
             .map((article) => article.image_url)
             .filter((url): url is string => Boolean(url))
             .map(preloadImage),
         );
 
-        console.log("[Featured News] Images ready.");
+        /*
+         * 4. Wait for all important assets.
+         */
+        await Promise.all([
+          heroImagePromise,
+          newsImagesPromise,
+          fontsPromise,
+        ]);
+
+        console.log("[Website] Important assets ready.");
       } catch (error) {
-        console.error("[Featured News] Loading failed:", error);
+        console.error("[Website] Initialization failed:", error);
+
+        /*
+         * Even if Supabase fails, don't leave the user
+         * stuck on the loading screen.
+         */
+        await Promise.all([
+          preloadImage("/hero-academy.jpg"),
+          preloadFonts(),
+        ]);
       } finally {
+        /*
+         * 5. Hide loading screen only after assets finish.
+         */
         if (mounted) {
           setIsLoading(false);
         }
       }
-      // Wait until website fonts are fully loaded.
-      await Promise.all([
-        document.fonts.load('16px "Battambang"'),
-        document.fonts.load('16px "Inter"'),
-      ]);
-
-      await document.fonts.ready;
     }
 
     initializeWebsite();
@@ -217,7 +266,7 @@ function PublicWebsite() {
 }
 
 /* =========================================
-MAIN APP
+   MAIN APP
 ========================================= */
 
 export default function App() {
