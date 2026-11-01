@@ -692,8 +692,8 @@ export default function NewsDetail() {
                   <Eye size={16} />
 
                   {isKhmer
-                    ? `ចំនួនអ្នកទស្សនា ${viewCount}`
-                    : `${viewCount} views`}
+                    ? `ចំនួនអ្នកទស្សនា ${viewCount} នាក់`
+                    : ` ${viewCount} views`}
                 </span>
 
                 {/* Share dropdown */}

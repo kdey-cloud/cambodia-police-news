@@ -1,6 +1,16 @@
-
 {
   "rewrites": [
+    {
+      "source": "/news/:id",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": ".*(facebookexternalhit|Facebot|Twitterbot|TelegramBot|WhatsApp|LinkedInBot|Slackbot|Discordbot).*"
+        }
+      ],
+      "destination": "/api/news/:id"
+    },
     {
       "source": "/(.*)",
       "destination": "/index.html"
