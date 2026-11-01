@@ -28,14 +28,15 @@ export default function Hero() {
       "
     >
       {/* Background image */}
-      <div className="absolute inset-0 -z-20 overflow-hidden">
+
+      <div className="absolute inset-0 -z-20">
         <img
           src="/hero-academy.jpg"
           alt=""
-          fetchPriority="high"
-          decoding="async"
-          draggable={false}
-          className="hero-background-image object-cover object-center"
+          className="
+      h-full w-full object-cover object-center
+      [mask-image:linear-gradient(to_bottom,black_calc(10%-20px),transparent_100%)]
+    "
         />
       </div>
 
