@@ -14,13 +14,19 @@ export default async function handler(req, res) {
       {
         headers: {
           apikey: supabaseKey,
-          Authorization: `Bearer ${supabaseKey}`,
         },
       },
     );
 
     if (!response.ok) {
-      throw new Error("Unable to retrieve article.");
+      const errorBody = await response.text();
+
+      console.error("Supabase REST error:", {
+        status: response.status,
+        body: errorBody,
+      });
+
+      throw new Error(`Unable to retrieve article (${response.status}).`);
     }
 
     const articles = await response.json();
@@ -38,12 +44,11 @@ export default async function handler(req, res) {
       article.summary_kh ||
       "Official news from the Police Academy of Cambodia.";
 
-const image =
-  article.image_url ||
-  "https://cambodia-police-news.vercel.app/share-image.jpg";
+    const image =
+      article.image_url ||
+      "https://cambodia-police-news.vercel.app/share-image.jpg";
 
-const articleUrl =
-  `https://cambodia-police-news.vercel.app/news/${article.id}`;
+    const articleUrl = `https://cambodia-police-news.vercel.app/news/${article.id}`;
 
     const escapeHTML = (value) =>
       String(value)
